@@ -1,6 +1,6 @@
 module github.com/petersr/attn
 
-go 1.25.7
+go 1.24.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
