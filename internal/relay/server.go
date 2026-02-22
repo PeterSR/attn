@@ -52,8 +52,10 @@ func (s *Server) Listen() error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.SocketPath, err)
 	}
-	// Restrict socket permissions.
-	os.Chmod(s.SocketPath, 0600)
+	if err := os.Chmod(s.SocketPath, 0600); err != nil {
+		l.Close()
+		return fmt.Errorf("chmod socket: %w", err)
+	}
 	s.listener = l
 	return nil
 }
@@ -98,24 +100,24 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	for scanner.Scan() {
 		var msg Message
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
-			enc.Encode(Response{OK: false, Error: "invalid JSON"})
+			_ = enc.Encode(Response{OK: false, Error: "invalid JSON"})
 			continue
 		}
 
 		switch msg.Type {
 		case "ping":
-			enc.Encode(Response{OK: true})
+			_ = enc.Encode(Response{OK: true})
 
 		case "notify":
 			if msg.Notify == nil {
-				enc.Encode(Response{OK: false, Error: "missing notify payload"})
+				_ = enc.Encode(Response{OK: false, Error: "missing notify payload"})
 				continue
 			}
 			s.dispatch(ctx, *msg.Notify)
-			enc.Encode(Response{OK: true})
+			_ = enc.Encode(Response{OK: true})
 
 		default:
-			enc.Encode(Response{OK: false, Error: "unknown message type"})
+			_ = enc.Encode(Response{OK: false, Error: "unknown message type"})
 		}
 	}
 }

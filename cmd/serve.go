@@ -224,8 +224,7 @@ func uninstallService() error {
 	}
 	fmt.Printf("removed %s\n", servicePath)
 
-	cmd := newCommand("systemctl", "--user", "daemon-reload")
-	cmd.Run()
+	_ = newCommand("systemctl", "--user", "daemon-reload").Run()
 
 	fmt.Println("\nattn relay service uninstalled.")
 	return nil

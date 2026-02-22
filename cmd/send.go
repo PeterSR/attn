@@ -39,11 +39,7 @@ func (s *SendCmd) Run(globals *CLI) error {
 	}
 
 	// Focus suppression.
-	skipRegex := s.SkipIfFocused
-	if skipRegex == "" && cfg.Context.Mode != "" {
-		// Could also support focus regex in config; for now only CLI.
-	}
-	if focus.ShouldSuppress(skipRegex) {
+	if focus.ShouldSuppress(s.SkipIfFocused) {
 		return nil
 	}
 
