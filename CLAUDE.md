@@ -14,7 +14,7 @@ golangci-lint run ./...                     # Lint (same as CI, v1.64.8)
 
 **After any significant change, run the full CI pipeline locally before considering the work done:**
 ```bash
-go build -o /dev/null . && go vet ./... && go test -race ./... && golangci-lint run ./...
+make ci
 ```
 
 Cross-compile (all targets use CGO_ENABLED=0):
