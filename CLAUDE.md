@@ -31,7 +31,7 @@ go build -ldflags "-s -w -X main.version=v1.0.0" -o attn .
 
 ## Architecture
 
-**CLI framework**: `alecthomas/kong` with struct-based command definitions in `cmd/`. Three commands: `send`, `serve`, `version`. No implicit default command — `send` must be explicit.
+**CLI framework**: `alecthomas/kong` with struct-based command definitions in `cmd/`. Four commands: `send`, `serve`, `config`, `version`. No implicit default command — `send` must be explicit.
 
 **Channel system** (`internal/channel/`): Core abstraction. All notification backends implement:
 ```go
@@ -62,7 +62,7 @@ Channels: `desktop` (D-Bus), `bell` (\a), `ntfy`, `pushover`, `webhook`, `remote
 
 **Template rendering** (`internal/render/`): Title, message body, and `format.prefix` support Go `text/template` with variables `{{.Dir}}`, `{{.Path}}`, `{{.Repo}}`, `{{.Branch}}`, and `{{env "VAR"}}`. On error, returns the literal string unchanged. Context data is gathered by `internal/autocontext/` which provides an `Info` struct with CWD and git info (200ms timeout).
 
-**Config** (`internal/config/`): TOML at `~/.config/attn/config.toml`. `[format]` section has a `prefix` template (empty by default) prepended to every message body. Each channel has a `when` field (`never`/`active`/`idle`/`always`). Desktop defaults to `active`, everything else to `never`. Old `enabled` bool is still accepted for backward compat and migrated to `when` in `Load()`. Missing config file is not an error.
+**Config** (`internal/config/`): TOML at `~/.config/attn/config.toml` (override via `ATTN_CONFIG_PATH` env or `--config` flag). `[format]` section has a `prefix` template (empty by default) prepended to every message body. Each channel has a `when` field (`never`/`active`/`idle`/`always`). Desktop defaults to `active`, everything else to `never`. Old `enabled` bool is still accepted for backward compat and migrated to `when` in `Load()`. Missing config file is not an error. `keys.go` has a registry of settable keys; `edit.go` does line-level TOML editing that preserves comments. `attn config set/get/path` subcommands use these.
 
 ## Release
 

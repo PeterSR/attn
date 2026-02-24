@@ -6,8 +6,9 @@ var version = "dev"
 type CLI struct {
 	Send    SendCmd    `cmd:"" help:"Send a notification."`
 	Serve   ServeCmd   `cmd:"" help:"Start the relay server for remote notifications."`
+	Config  ConfigCmd  `cmd:"" help:"Get and set configuration values."`
 	Version VersionCmd `cmd:"" help:"Print version information."`
 
 	// Global flags.
-	Config string `short:"C" help:"Config file path." default:"" env:"ATTN_CONFIG"`
+	ConfigFile string `name:"config" short:"C" help:"Config file path." default:"" env:"ATTN_CONFIG_PATH"`
 }

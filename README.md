@@ -51,6 +51,9 @@ attn send -t '{{env "USER"}}' "Task done"
 ```
 attn send [flags] [message...]   Send a notification
 attn serve [flags]               Start the relay server
+attn config set <key> <value>    Set a config value
+attn config get <key>            Get a config value
+attn config path                 Print config file path
 attn version                     Print version
 ```
 
@@ -66,9 +69,28 @@ attn version                     Print version
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--config` | `-C` | `~/.config/attn/config.toml` | Config file path |
+| `--config` | `-C` | `~/.config/attn/config.toml` | Config file path (env: `ATTN_CONFIG_PATH`) |
 
 ## Configuration
+
+The config file path is determined by (in order): `--config` / `-C` flag, `ATTN_CONFIG_PATH` env var, or the default `~/.config/attn/config.toml`.
+
+### CLI configuration
+
+```bash
+# Set a value
+attn config set ntfy.topic "my-topic"
+attn config set desktop.when active
+
+# Read a value (shows effective value including defaults)
+attn config get ntfy.server     # → https://ntfy.sh
+attn config get desktop.when    # → active
+
+# Print the config file path
+attn config path
+```
+
+### Config file
 
 Create `~/.config/attn/config.toml`:
 

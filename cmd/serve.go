@@ -38,7 +38,7 @@ WantedBy=default.target
 `
 
 func (s *ServeCmd) Run(globals *CLI) error {
-	cfg, err := config.Load(globals.Config)
+	cfg, err := config.Load(globals.ConfigFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "attn: warning: config load: %v\n", err)
 		cfg = config.Default()

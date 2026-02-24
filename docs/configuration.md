@@ -2,6 +2,42 @@
 
 attn is configured via a TOML file at `~/.config/attn/config.toml`. If the file doesn't exist, sensible defaults are used.
 
+The config file path is determined by (in order): `--config` / `-C` flag, `ATTN_CONFIG_PATH` env var, or the default `~/.config/attn/config.toml`.
+
+## CLI configuration
+
+You can read and write config values from the command line:
+
+```bash
+attn config set <key> <value>   # Set a value
+attn config get <key>           # Get the effective value (including defaults)
+attn config path                # Print the config file path
+```
+
+### Supported keys
+
+| Key | Validation |
+|-----|-----------|
+| `format.prefix` | any string |
+| `desktop.when` | `never`, `active`, `idle`, `always` |
+| `bell.when` | same |
+| `ntfy.when`, `ntfy.server`, `ntfy.topic`, `ntfy.token` | `when` validated, rest any string |
+| `pushover.when`, `pushover.token`, `pushover.user_key` | same |
+| `webhook.when`, `webhook.url`, `webhook.method` | same |
+| `relay.when`, `relay.socket_path` | same |
+
+### Examples
+
+```bash
+# Quick ntfy setup
+attn config set ntfy.topic my-notifications
+attn config set ntfy.when idle
+
+# Check effective values
+attn config get ntfy.server     # → https://ntfy.sh (default)
+attn config get desktop.when    # → active (default)
+```
+
 ## Full example
 
 ```toml
