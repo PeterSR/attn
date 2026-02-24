@@ -79,8 +79,7 @@ Sends a JSON payload:
 {
   "title": "Notification",
   "body": "Build complete",
-  "urgency": "normal",
-  "context": "myrepo:main"
+  "urgency": "normal"
 }
 ```
 

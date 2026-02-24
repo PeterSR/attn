@@ -60,9 +60,9 @@ Channels: `desktop` (D-Bus), `bell` (\a), `ntfy`, `pushover`, `webhook`, `remote
 
 **SSH tunnel manager** (`internal/tunnel/tunnel.go`): Spawns `ssh -N -R` processes per configured tunnel. Uses system `ssh` binary (inherits user's config/agent/ProxyJump). Auto-reconnects with exponential backoff (1s to 60s cap).
 
-**Auto-context** (`internal/autocontext/`): Derives `repo:branch` from git with 200ms timeout. Falls back to directory basename. Git not installed is not an error.
+**Template rendering** (`internal/render/`): Title, message body, and `format.prefix` support Go `text/template` with variables `{{.Dir}}`, `{{.Path}}`, `{{.Repo}}`, `{{.Branch}}`, and `{{env "VAR"}}`. On error, returns the literal string unchanged. Context data is gathered by `internal/autocontext/` which provides an `Info` struct with CWD and git info (200ms timeout).
 
-**Config** (`internal/config/`): TOML at `~/.config/attn/config.toml`. Each channel has a `when` field (`never`/`active`/`idle`/`always`). Desktop defaults to `active`, everything else to `never`. Old `enabled` bool is still accepted for backward compat and migrated to `when` in `Load()`. Missing config file is not an error.
+**Config** (`internal/config/`): TOML at `~/.config/attn/config.toml`. `[format]` section has a `prefix` template (empty by default) prepended to every message body. Each channel has a `when` field (`never`/`active`/`idle`/`always`). Desktop defaults to `active`, everything else to `never`. Old `enabled` bool is still accepted for backward compat and migrated to `when` in `Load()`. Missing config file is not an error.
 
 ## Release
 

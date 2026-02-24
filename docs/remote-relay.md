@@ -46,7 +46,7 @@ JSON-lines over Unix socket (`internal/relay/protocol.go`):
 
 **Request** (one JSON object per line):
 ```json
-{"v":1,"type":"notify","notify":{"title":"Build","body":"Complete","urgency":"normal","timeout_ms":5000,"context":"myrepo:main"},"hops":1}
+{"v":1,"type":"notify","notify":{"title":"Build","body":"Complete","urgency":"normal","timeout_ms":5000},"hops":1}
 ```
 
 **Response:**
