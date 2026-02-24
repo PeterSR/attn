@@ -34,6 +34,7 @@ type Config struct {
 	Ntfy     NtfyConfig     `toml:"ntfy"`
 	Pushover PushoverConfig `toml:"pushover"`
 	Webhook  WebhookConfig  `toml:"webhook"`
+	Relay    RelayConfig    `toml:"relay"`
 	Serve    ServeConfig    `toml:"serve"`
 }
 
@@ -74,17 +75,22 @@ type WebhookConfig struct {
 	Headers map[string]string `toml:"headers"`
 }
 
+type RelayConfig struct {
+	When       When   `toml:"when"`
+	SocketPath string `toml:"socket_path"`
+}
+
 type ServeConfig struct {
 	SocketPath string         `toml:"socket_path"`
 	Tunnels    []TunnelConfig `toml:"tunnels"`
 }
 
 type TunnelConfig struct {
-	Name         string `toml:"name"`
-	Host         string `toml:"host"`
-	User         string `toml:"user"`
-	RemoteSocket string `toml:"remote_socket"`
-	IdentityFile string `toml:"identity_file"`
+	Name             string `toml:"name"`
+	Host             string `toml:"host"`
+	User             string `toml:"user"`
+	RemoteSocketPath string `toml:"remote_socket_path"`
+	IdentityFile     string `toml:"identity_file"`
 }
 
 // Default returns a Config with sensible defaults.
@@ -152,6 +158,7 @@ func Load(path string) (Config, error) {
 		"ntfy":     cfg.Ntfy.When,
 		"pushover": cfg.Pushover.When,
 		"webhook":  cfg.Webhook.When,
+		"relay":    cfg.Relay.When,
 	} {
 		if !w.Valid() {
 			return cfg, fmt.Errorf("%s.when: invalid value %q", name, w)

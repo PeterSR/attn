@@ -91,9 +91,15 @@ func (m *Manager) runTunnel(ctx context.Context, cfg config.TunnelConfig) {
 }
 
 func (m *Manager) execSSH(ctx context.Context, cfg config.TunnelConfig) error {
-	remoteSocket := cfg.RemoteSocket
+	remoteSocket := cfg.RemoteSocketPath
 	if remoteSocket == "" {
-		return fmt.Errorf("remote_socket not configured")
+		// Infer remote socket path by querying the remote user's UID.
+		uid, err := m.resolveRemoteUID(ctx, cfg)
+		if err != nil {
+			return fmt.Errorf("infer remote socket path: %w", err)
+		}
+		remoteSocket = fmt.Sprintf("/run/user/%s/attn.sock", uid)
+		log.Printf("tunnel %q: inferred remote socket path: %s", cfg.Name, remoteSocket)
 	}
 
 	// Build SSH args.
@@ -108,10 +114,6 @@ func (m *Manager) execSSH(ctx context.Context, cfg config.TunnelConfig) error {
 	if cfg.IdentityFile != "" {
 		idFile := cfg.IdentityFile
 		if strings.HasPrefix(idFile, "~/") {
-			// Expand ~ manually since exec doesn't use shell.
-			if home, err := exec.LookPath("sh"); err == nil {
-				_ = home // not needed, just expand ~
-			}
 			idFile = expandHome(idFile)
 		}
 		args = append(args, "-i", idFile)
@@ -125,6 +127,39 @@ func (m *Manager) execSSH(ctx context.Context, cfg config.TunnelConfig) error {
 
 	cmd := exec.CommandContext(ctx, "ssh", args...)
 	return cmd.Run()
+}
+
+// resolveRemoteUID runs a quick SSH command to determine the remote user's UID.
+func (m *Manager) resolveRemoteUID(ctx context.Context, cfg config.TunnelConfig) (string, error) {
+	args := []string{
+		"-o", "ConnectTimeout=10",
+	}
+
+	if cfg.IdentityFile != "" {
+		idFile := cfg.IdentityFile
+		if strings.HasPrefix(idFile, "~/") {
+			idFile = expandHome(idFile)
+		}
+		args = append(args, "-i", idFile)
+	}
+
+	dest := cfg.Host
+	if cfg.User != "" {
+		dest = cfg.User + "@" + cfg.Host
+	}
+	args = append(args, dest, "id", "-u")
+
+	cmd := exec.CommandContext(ctx, "ssh", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("ssh %s id -u: %w", dest, err)
+	}
+
+	uid := strings.TrimSpace(string(out))
+	if uid == "" {
+		return "", fmt.Errorf("ssh %s id -u: empty output", dest)
+	}
+	return uid, nil
 }
 
 func expandHome(path string) string {

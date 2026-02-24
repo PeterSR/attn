@@ -11,12 +11,8 @@ import (
 	"text/template"
 
 	"github.com/petersr/attn/internal/channel"
-	"github.com/petersr/attn/internal/channel/bell"
-	"github.com/petersr/attn/internal/channel/desktop"
-	"github.com/petersr/attn/internal/channel/ntfy"
-	"github.com/petersr/attn/internal/channel/pushover"
-	"github.com/petersr/attn/internal/channel/webhook"
 	"github.com/petersr/attn/internal/config"
+	"github.com/petersr/attn/internal/notification"
 	"github.com/petersr/attn/internal/relay"
 	"github.com/petersr/attn/internal/tunnel"
 )
@@ -67,14 +63,13 @@ func (s *ServeCmd) Run(globals *CLI) error {
 }
 
 func runServer(cfg config.Config, socketPath string) error {
-	channels := buildServerChannels(cfg)
-	if len(channels) == 0 {
-		log.Println("warning: no notification channels enabled")
-	}
-
 	srv := &relay.Server{
 		SocketPath: socketPath,
-		Channels:   channels,
+		DispatchFunc: func(ctx context.Context, n notification.Notification, hops int) error {
+			entries := buildChannelEntries(cfg, hops)
+			state := channel.DetectScreenState(entries)
+			return channel.DispatchFiltered(ctx, entries, state, n)
+		},
 	}
 
 	if err := srv.Listen(); err != nil {
@@ -102,28 +97,6 @@ func runServer(cfg config.Config, socketPath string) error {
 	}()
 
 	return srv.Serve(ctx)
-}
-
-func buildServerChannels(cfg config.Config) []channel.Channel {
-	var channels []channel.Channel
-
-	if cfg.Desktop.When != config.WhenNever {
-		channels = append(channels, desktop.New())
-	}
-	if cfg.Bell.When != config.WhenNever {
-		channels = append(channels, bell.New())
-	}
-	if cfg.Ntfy.When != config.WhenNever && cfg.Ntfy.Topic != "" {
-		channels = append(channels, ntfy.New(cfg.Ntfy.Server, cfg.Ntfy.Topic, cfg.Ntfy.Token))
-	}
-	if cfg.Pushover.When != config.WhenNever && cfg.Pushover.Token != "" && cfg.Pushover.UserKey != "" {
-		channels = append(channels, pushover.New(cfg.Pushover.Token, cfg.Pushover.UserKey))
-	}
-	if cfg.Webhook.When != config.WhenNever && cfg.Webhook.URL != "" {
-		channels = append(channels, webhook.New(cfg.Webhook.URL, cfg.Webhook.Method, cfg.Webhook.Headers))
-	}
-
-	return channels
 }
 
 func installService(socketPath string) error {

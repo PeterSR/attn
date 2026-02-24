@@ -10,15 +10,18 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/petersr/attn/internal/channel"
 	"github.com/petersr/attn/internal/notification"
 )
 
+// DispatchFunc is called by the server to dispatch a received notification.
+// The hops parameter indicates how many relay hops this notification has taken.
+type DispatchFunc func(ctx context.Context, n notification.Notification, hops int) error
+
 // Server listens on a Unix socket and dispatches incoming notifications.
 type Server struct {
-	SocketPath string
-	Channels   []channel.Channel
-	listener   net.Listener
+	SocketPath   string
+	DispatchFunc DispatchFunc
+	listener     net.Listener
 }
 
 // DefaultSocketPath returns the default socket path.
@@ -113,17 +116,17 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 				_ = enc.Encode(Response{OK: false, Error: "missing notify payload"})
 				continue
 			}
-			s.dispatch(ctx, *msg.Notify)
+			if msg.Hops >= MaxHops {
+				_ = enc.Encode(Response{OK: false, Error: fmt.Sprintf("max hops (%d) exceeded", MaxHops)})
+				continue
+			}
+			if err := s.DispatchFunc(ctx, *msg.Notify, msg.Hops); err != nil {
+				log.Printf("relay: dispatch error: %v", err)
+			}
 			_ = enc.Encode(Response{OK: true})
 
 		default:
 			_ = enc.Encode(Response{OK: false, Error: "unknown message type"})
 		}
-	}
-}
-
-func (s *Server) dispatch(ctx context.Context, n notification.Notification) {
-	if err := channel.Dispatch(ctx, s.Channels, n); err != nil {
-		log.Printf("relay: dispatch error: %v", err)
 	}
 }

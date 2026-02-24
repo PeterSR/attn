@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/petersr/attn/internal/focus"
 	"github.com/petersr/attn/internal/notification"
+	"github.com/petersr/attn/internal/screen"
 )
 
 // Channel sends a notification through a specific backend.
@@ -68,6 +70,43 @@ func ShouldFire(when When, state ScreenState) bool {
 	default:
 		return false
 	}
+}
+
+// DetectScreenState evaluates screen and focus state once. Only performs
+// detection if at least one channel entry needs it.
+func DetectScreenState(entries []Entry) ScreenState {
+	needsDetection := false
+	for _, e := range entries {
+		if e.When == WhenActive || e.When == WhenIdle {
+			needsDetection = true
+			break
+		}
+	}
+	if !needsDetection {
+		return ScreenState{}
+	}
+
+	screenState := screen.Get()
+	state := ScreenState{
+		DetectionOK: screenState != screen.StateUnknown,
+		Idle:        screenState == screen.StateIdle,
+	}
+
+	// Only check process tree if screen is active and an "active" channel exists.
+	if !state.Idle && state.DetectionOK {
+		needsProcessTree := false
+		for _, e := range entries {
+			if e.When == WhenActive {
+				needsProcessTree = true
+				break
+			}
+		}
+		if needsProcessTree {
+			state.InProcessTree = focus.IsInProcessTree()
+		}
+	}
+
+	return state
 }
 
 // DispatchFiltered fires a notification to channels whose When condition

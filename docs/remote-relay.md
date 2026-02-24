@@ -1,27 +1,44 @@
 # Remote Relay
 
-attn can relay notifications from remote servers to your local machine via SSH socket forwarding.
+attn can relay notifications from remote servers to your local machine via SSH socket forwarding. The relay is a regular notification channel, so it participates in the `when` condition system and can be chained across multiple machines.
 
 ## Architecture
 
+There are two sides to configure:
+
+- **Local side** (`[serve]`): The relay server that listens on a Unix socket and dispatches received notifications through local channels. Tunnel configuration specifies which remote machines to connect to.
+- **Remote side** (`[relay]`): A notification channel that sends to a Unix socket created by the SSH tunnel.
+
 ```
-Remote machine                          Local machine
-┌──────────────────┐                    ┌──────────────────────┐
-│ attn send "Done" │                    │ attn serve           │
-│   │              │                    │   │                  │
-│   ▼              │                    │   ▼                  │
-│ Unix socket ─────┼── SSH tunnel ──────┼─► Unix socket        │
-│ (JSON-lines)     │                    │   │                  │
-│                  │                    │   ▼                  │
-│                  │                    │ Desktop / Bell / etc │
-└──────────────────┘                    └──────────────────────┘
+Remote machine (devbox)                   Local machine
+┌──────────────────────┐                  ┌───────────────────────┐
+│ attn send "Done"     │                  │ attn serve            │
+│   │                  │                  │   │                   │
+│   ▼                  │                  │   ▼                   │
+│ [relay] channel      │                  │ DispatchFunc          │
+│   │                  │                  │   │                   │
+│   ▼                  │                  │   ▼                   │
+│ Unix socket ─────────┼── SSH tunnel ────┼─► Unix socket         │
+│                      │                  │   │                   │
+│                      │                  │   ▼                   │
+│                      │                  │ Desktop / ntfy / etc  │
+└──────────────────────┘                  └───────────────────────┘
 ```
 
-### Components
+### Chaining (A → B → C)
 
-1. **Relay server** (`attn serve`): Listens on a Unix socket, receives notifications, dispatches them through local channels.
-2. **Remote client**: When `attn send` detects it's in an SSH session and a relay socket exists, it sends the notification over the socket instead of firing local channels.
-3. **SSH tunnel manager**: Optionally maintains `ssh -N -R` tunnels to configured remote machines.
+Because relay is a regular channel, the relay server dispatches received notifications through the full channel pipeline — including potentially another relay channel. This enables multi-hop forwarding:
+
+```
+Machine C              Machine B              Machine A (desktop)
+┌──────────┐           ┌──────────┐           ┌──────────┐
+│ attn send│──relay──►│ attn serve│──relay──►│ attn serve│
+│          │           │ + relay  │           │          │
+└──────────┘           └──────────┘           └──────────┘
+                                               Desktop ✓
+```
+
+A hop counter in the wire protocol prevents infinite loops. Notifications are dropped after 10 hops.
 
 ## Wire protocol
 
@@ -29,13 +46,15 @@ JSON-lines over Unix socket (`internal/relay/protocol.go`):
 
 **Request** (one JSON object per line):
 ```json
-{"title":"Build","body":"Complete","urgency":"normal","timeout_ms":5000,"context":"myrepo:main"}
+{"v":1,"type":"notify","notify":{"title":"Build","body":"Complete","urgency":"normal","timeout_ms":5000,"context":"myrepo:main"},"hops":1}
 ```
 
 **Response:**
 ```json
 {"ok":true}
 ```
+
+The `hops` field tracks how many relay hops a notification has taken. Each relay channel increments it before sending.
 
 ## Setup
 
@@ -49,48 +68,54 @@ attn serve --install
 attn serve
 ```
 
-Default socket: `$XDG_RUNTIME_DIR/attn.sock` (typically `/run/user/1000/attn.sock`).
+Default socket: `$XDG_RUNTIME_DIR/attn.sock` (typically `/run/user/<uid>/attn.sock`).
 
-### 2. Configure SSH tunnels
+### 2. Configure SSH tunnels (local config)
 
 ```toml
 [serve]
-socket_path = "/run/user/1000/attn.sock"
+# socket_path defaults to $XDG_RUNTIME_DIR/attn.sock
 
 [[serve.tunnels]]
 name = "devbox"
 host = "devbox.example.com"
-user = "peter"
-remote_socket = "/run/user/1000/attn.sock"
-# identity_file = "~/.ssh/id_ed25519"
+user = "deploy"
+# remote_socket_path auto-inferred as /run/user/<remote-uid>/attn.sock
 ```
 
-The tunnel manager spawns `ssh -N -R <remote_socket>:<local_socket> <host>` for each tunnel. It:
+If `remote_socket_path` is omitted, the tunnel manager runs `ssh <host> id -u` to determine the remote user's UID and derives the path as `/run/user/<uid>/attn.sock`. You can override it explicitly if needed.
+
+The tunnel manager spawns `ssh -N -R <remote_socket_path>:<local_socket> <host>` for each tunnel. It:
 - Uses the system `ssh` binary (inherits `~/.ssh/config`, agent, ProxyJump)
 - Auto-reconnects with exponential backoff (1s to 60s cap)
 - Runs as long as the relay server is running
 
-### 3. Use on the remote machine
+### 3. Enable relay on the remote machine (remote config)
 
-Just run `attn send` normally. Socket detection order:
+```toml
+[relay]
+when = "always"
+# socket_path defaults to $XDG_RUNTIME_DIR/attn.sock
+```
 
-1. `$ATTN_SOCK` environment variable
-2. `serve.socket_path` from config (only in SSH sessions)
-3. `$XDG_RUNTIME_DIR/attn.sock` (only in SSH sessions)
+Both `relay.socket_path` and the tunnel's remote socket path default to `/run/user/<uid>/attn.sock`. In most cases no explicit socket paths are needed — just set `when = "always"` on the remote.
+
+### 4. Use on the remote machine
+
+```bash
+# On the remote server — notification appears on your local desktop
+attn send -t "GPU Training" "Epoch 50 complete"
+```
 
 ### Manual SSH tunnel
 
 If you prefer managing SSH connections yourself:
 
 ```bash
-ssh -R /run/user/1000/attn.sock:/run/user/1000/attn.sock remote-host
+ssh -R /run/user/2000/attn.sock:/run/user/1000/attn.sock remote-host
 ```
 
-Or set `ATTN_SOCK` on the remote to point to the forwarded socket path.
-
-## Relay server channels
-
-The relay server dispatches notifications through all configured channels (any channel with `when` not set to `never`). It does **not** evaluate `when` conditions at dispatch time — the assumption is that if a notification was relayed from a remote machine, it should always be delivered locally. The `when` condition evaluation happens on the originating machine.
+Or set `ATTN_SOCK` on the remote to override the socket path.
 
 ## Systemd service
 
@@ -107,8 +132,8 @@ journalctl --user -u attn -f   # view logs
 | Component | File |
 |-----------|------|
 | Relay server | `internal/relay/server.go` |
-| Remote client | `internal/channel/remote/client.go` |
+| Relay channel | `internal/channel/remote/client.go` |
 | Wire protocol | `internal/relay/protocol.go` |
 | Tunnel manager | `internal/tunnel/tunnel.go` |
-| Socket detection | `cmd/send.go` — `detectRelaySocket()` |
-| Server channels | `cmd/serve.go` — `buildServerChannels()` |
+| Channel builder | `cmd/channels.go` — `buildChannelEntries()` |
+| Config | `internal/config/config.go` — `RelayConfig` |

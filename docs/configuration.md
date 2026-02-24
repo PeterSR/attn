@@ -31,6 +31,10 @@ url = "https://hooks.slack.com/services/T.../B.../xxx"
 method = "POST"
 headers = { "Content-Type" = "application/json" }
 
+[relay]
+when = "always"
+# socket_path = ""  # default: $XDG_RUNTIME_DIR/attn.sock
+
 [serve]
 socket_path = "/run/user/1000/attn.sock"
 
@@ -38,7 +42,7 @@ socket_path = "/run/user/1000/attn.sock"
 name = "devbox"
 host = "devbox.example.com"
 user = "peter"
-remote_socket = "/run/user/1000/attn.sock"
+remote_socket_path = "/run/user/1000/attn.sock"
 ```
 
 ## The `when` field
@@ -61,6 +65,7 @@ Every channel has a `when` field that controls when it fires:
 | ntfy | `never` |
 | pushover | `never` |
 | webhook | `never` |
+| relay | `never` |
 
 ### Common setups
 
@@ -120,6 +125,22 @@ mode = "auto"  # default
 
 Context can also be overridden per-invocation with `--context` or disabled with `--no-context`.
 
+## Relay (channel)
+
+The relay channel sends notifications to a local Unix socket, where a relay server (`attn serve`) can receive and re-dispatch them. This is used on remote machines to forward notifications back to your local workstation.
+
+```toml
+[relay]
+when = "always"                              # required to enable
+socket_path = "/run/user/2000/attn.sock"     # default: $XDG_RUNTIME_DIR/attn.sock
+```
+
+The `socket_path` must match the tunnel's remote socket path. In most cases, both default to `/run/user/<uid>/attn.sock` and no explicit configuration is needed.
+
+Relay supports chaining (A → B → C). A hop counter prevents infinite loops — notifications are dropped after 10 hops.
+
+See [Remote Relay](remote-relay.md) for the full architecture.
+
 ## Serve (relay server)
 
 ```toml
@@ -130,8 +151,10 @@ socket_path = "/run/user/1000/attn.sock"  # default: $XDG_RUNTIME_DIR/attn.sock
 name = "devbox"           # display name for logs
 host = "devbox.example.com"
 user = "peter"
-remote_socket = "/run/user/1000/attn.sock"
-identity_file = "~/.ssh/id_ed25519"  # optional
+# remote_socket_path = ""  # optional: auto-inferred as /run/user/<remote-uid>/attn.sock
+# identity_file = "~/.ssh/id_ed25519"  # optional
 ```
+
+If `remote_socket_path` is omitted, the tunnel manager runs `ssh <host> id -u` to determine the remote user's UID and derives the path as `/run/user/<uid>/attn.sock`.
 
 See [Remote Relay](remote-relay.md) for details on the relay architecture.

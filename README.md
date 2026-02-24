@@ -100,6 +100,10 @@ when = "never"
 # url = "https://hooks.slack.com/services/..."
 # method = "POST"
 # headers = { "Content-Type" = "application/json" }
+
+[relay]
+when = "never"  # enable on remote machines to relay notifications back
+# socket_path = ""  # default: $XDG_RUNTIME_DIR/attn.sock
 ```
 
 ### Channel conditions (`when`)
@@ -110,6 +114,8 @@ when = "never"
 | `active` | Fire when screen is on, unlocked, and the focused window is **not** in attn's process tree |
 | `idle` | Fire when screen is off or locked |
 | `always` | Fire unconditionally |
+
+Relay is a regular channel — it participates in the `when` condition system and supports chaining across multiple machines. See [Remote Relay](docs/remote-relay.md).
 
 **Fail-safe behavior:**
 - `active` channels **fail open** — if screen state can't be detected, they fire anyway
@@ -143,7 +149,7 @@ attn serve --install
 attn serve
 ```
 
-### 2. Configure SSH tunnels
+### 2. Configure SSH tunnels (local config)
 
 Add tunnels to your config and they'll be maintained automatically:
 
@@ -154,22 +160,29 @@ Add tunnels to your config and they'll be maintained automatically:
 [[serve.tunnels]]
 name = "devbox"
 host = "devbox.example.com"
-user = "peter"
-remote_socket = "/run/user/1000/attn.sock"
-# identity_file = "~/.ssh/id_ed25519"  # optional
+user = "deploy"
+# remote_socket_path auto-inferred via ssh id -u
 
 [[serve.tunnels]]
 name = "gpu-server"
 host = "gpu.internal"
 user = "peter"
-remote_socket = "/run/user/1000/attn.sock"
+# remote_socket_path = "/run/user/1000/attn.sock"  # or override explicitly
 ```
 
-Tunnels use your system `ssh` binary, so they inherit your `~/.ssh/config`, agent, ProxyJump, etc. They auto-reconnect with exponential backoff on disconnect.
+Tunnels use your system `ssh` binary, so they inherit your `~/.ssh/config`, agent, ProxyJump, etc. They auto-reconnect with exponential backoff on disconnect. If `remote_socket_path` is omitted, the remote user's UID is queried via `ssh id -u` and the path is derived as `/run/user/<uid>/attn.sock`.
 
-### 3. Use attn on the remote server
+### 3. Enable relay on the remote machine (remote config)
 
-Install `attn` on the remote server and use it normally. It auto-detects the forwarded socket and relays notifications back to your local machine.
+Install `attn` on the remote server and enable the relay channel:
+
+```toml
+[relay]
+when = "always"
+# socket_path defaults to $XDG_RUNTIME_DIR/attn.sock
+```
+
+In most cases no explicit socket paths are needed — both sides default to `/run/user/<uid>/attn.sock`.
 
 ```bash
 # On the remote server — notification appears on your local desktop
@@ -181,10 +194,8 @@ attn send -t "GPU Training" "Epoch 50 complete"
 If you prefer managing SSH connections yourself:
 
 ```bash
-ssh -R /run/user/1000/attn.sock:/run/user/1000/attn.sock remote-host
+ssh -R /run/user/2000/attn.sock:/run/user/1000/attn.sock remote-host
 ```
-
-Or set `ATTN_SOCK` on the remote to point to the forwarded socket.
 
 ### Systemd service management
 

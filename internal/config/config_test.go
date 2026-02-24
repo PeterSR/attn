@@ -170,6 +170,57 @@ func TestLoadMissingFile(t *testing.T) {
 	}
 }
 
+func TestLoadRelayConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	content := `
+[relay]
+when = "always"
+socket_path = "/run/user/2000/attn.sock"
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cfg.Relay.When != WhenAlways {
+		t.Errorf("relay.when = %q, want %q", cfg.Relay.When, WhenAlways)
+	}
+	if cfg.Relay.SocketPath != "/run/user/2000/attn.sock" {
+		t.Errorf("relay.socket_path = %q, want %q", cfg.Relay.SocketPath, "/run/user/2000/attn.sock")
+	}
+}
+
+func TestLoadRelayDefaultNever(t *testing.T) {
+	cfg := Default()
+	if cfg.Relay.When != "" {
+		t.Errorf("Default relay.when = %q, want empty (defaults to never)", cfg.Relay.When)
+	}
+}
+
+func TestLoadRelayInvalidWhen(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	content := `
+[relay]
+when = "bogus"
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Error("Load() with invalid relay.when value should return error")
+	}
+}
+
 func TestWhenValid(t *testing.T) {
 	valid := []When{WhenNever, WhenActive, WhenIdle, WhenAlways, ""}
 	for _, w := range valid {

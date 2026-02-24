@@ -14,10 +14,11 @@ import (
 // Channel sends notifications through a Unix socket relay.
 type Channel struct {
 	socketPath string
+	hops       int
 }
 
-func New(socketPath string) *Channel {
-	return &Channel{socketPath: socketPath}
+func New(socketPath string, hops int) *Channel {
+	return &Channel{socketPath: socketPath, hops: hops}
 }
 
 func (c *Channel) Name() string { return "remote" }
@@ -34,6 +35,7 @@ func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
 		Version: 1,
 		Type:    "notify",
 		Notify:  &n,
+		Hops:    c.hops + 1,
 	}
 
 	data, err := json.Marshal(msg)

@@ -84,9 +84,20 @@ Sends a JSON payload:
 }
 ```
 
-## Remote (relay)
+## Relay
 
-Not configured as a channel in the config file. Instead, attn auto-detects when it's running on a remote machine (via SSH) and relays notifications through a Unix socket to the local machine's relay server. See [Remote Relay](remote-relay.md).
+Sends notifications to a Unix socket where a relay server (`attn serve`) is listening. Used on remote machines to forward notifications back to your local workstation via SSH tunnels.
+
+**Config:**
+```toml
+[relay]
+when = "always"
+# socket_path = ""  # default: $XDG_RUNTIME_DIR/attn.sock
+```
+
+The relay channel participates in the `when` condition system like any other channel. It supports chaining — a relay server can re-dispatch received notifications through its own relay channel to forward them further. A hop counter (max 10) prevents infinite loops.
+
+See [Remote Relay](remote-relay.md) for the full architecture.
 
 ## Channel dispatch
 
