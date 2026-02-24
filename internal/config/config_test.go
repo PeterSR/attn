@@ -221,6 +221,36 @@ when = "bogus"
 	}
 }
 
+func TestLoadFormatPrefix(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	content := `
+[format]
+prefix = "[{{.Repo}}:{{.Branch}}] "
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "[{{.Repo}}:{{.Branch}}] "
+	if cfg.Format.Prefix != want {
+		t.Errorf("format.prefix = %q, want %q", cfg.Format.Prefix, want)
+	}
+}
+
+func TestDefaultFormatPrefixEmpty(t *testing.T) {
+	cfg := Default()
+	if cfg.Format.Prefix != "" {
+		t.Errorf("Default format.prefix = %q, want empty", cfg.Format.Prefix)
+	}
+}
+
 func TestWhenValid(t *testing.T) {
 	valid := []When{WhenNever, WhenActive, WhenIdle, WhenAlways, ""}
 	for _, w := range valid {

@@ -25,8 +25,7 @@ func (c *Channel) Name() string { return "ntfy" }
 func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
 	url := strings.TrimRight(c.server, "/") + "/" + c.topic
 
-	body := n.FormatBody()
-	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(n.Body))
 	if err != nil {
 		return err
 	}

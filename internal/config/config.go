@@ -28,7 +28,7 @@ func (w When) Valid() bool {
 }
 
 type Config struct {
-	Context  ContextConfig  `toml:"context"`
+	Format   FormatConfig   `toml:"format"`
 	Desktop  DesktopConfig  `toml:"desktop"`
 	Bell     BellConfig     `toml:"bell"`
 	Ntfy     NtfyConfig     `toml:"ntfy"`
@@ -38,8 +38,8 @@ type Config struct {
 	Serve    ServeConfig    `toml:"serve"`
 }
 
-type ContextConfig struct {
-	Mode string `toml:"mode"` // "auto", "none", or a fixed string
+type FormatConfig struct {
+	Prefix string `toml:"prefix"`
 }
 
 type DesktopConfig struct {
@@ -96,7 +96,6 @@ type TunnelConfig struct {
 // Default returns a Config with sensible defaults.
 func Default() Config {
 	return Config{
-		Context: ContextConfig{Mode: "auto"},
 		Desktop: DesktopConfig{When: WhenActive},
 		Bell:    BellConfig{When: WhenNever},
 		Ntfy:    NtfyConfig{Server: "https://ntfy.sh"},
@@ -141,9 +140,6 @@ func Load(path string) (Config, error) {
 	migrateWebhook(&cfg)
 
 	// Apply non-channel defaults.
-	if cfg.Context.Mode == "" {
-		cfg.Context.Mode = "auto"
-	}
 	if cfg.Ntfy.Server == "" {
 		cfg.Ntfy.Server = "https://ntfy.sh"
 	}

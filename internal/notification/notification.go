@@ -15,13 +15,4 @@ type Notification struct {
 	Body      string  `json:"body"`
 	Urgency   Urgency `json:"urgency"`
 	TimeoutMS int     `json:"timeout_ms"`
-	Context   string  `json:"context,omitempty"`
-}
-
-// FormatBody returns the body with context prefix if set.
-func (n Notification) FormatBody() string {
-	if n.Context == "" {
-		return n.Body
-	}
-	return "[" + n.Context + "] " + n.Body
 }

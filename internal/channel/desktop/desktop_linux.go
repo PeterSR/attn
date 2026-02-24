@@ -33,7 +33,6 @@ func (c *Channel) Send(_ context.Context, n notification.Notification) error {
 		"/org/freedesktop/Notifications",
 	)
 
-	body := n.FormatBody()
 	urgency := urgencyToByte(n.Urgency)
 
 	call := obj.Call(
@@ -43,7 +42,7 @@ func (c *Channel) Send(_ context.Context, n notification.Notification) error {
 		uint32(0),             // replaces_id
 		"",                    // app_icon
 		n.Title,               // summary
-		body,                  // body
+		n.Body,                // body
 		[]string{},            // actions
 		map[string]godbus.Variant{ // hints
 			"urgency": godbus.MakeVariant(urgency),

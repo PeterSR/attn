@@ -10,7 +10,7 @@ A cross-platform notification tool that alerts you when long-running processes �
 - **Screen-aware routing** — send desktop notifications when active, push to your phone when the screen is locked
 - **Desktop notifications** — native D-Bus on Linux (no `notify-send` required), osascript on macOS
 - **Push notifications** — ntfy.sh, Pushover, generic webhooks (Slack, Discord, etc.)
-- **Auto-context** — automatically includes repo name and git branch so you know *which* task finished
+- **Templatable messages** — use Go templates in title, body, and a configurable prefix (`{{.Repo}}`, `{{.Branch}}`, `{{env "VAR"}}`, etc.)
 - **Remote relay** — get notifications from remote servers via SSH socket forwarding
 - **Managed SSH tunnels** — auto-maintain tunnels to your remote machines
 - **Single binary** — zero runtime dependencies, cross-compiled for Linux, macOS, and Windows
@@ -33,17 +33,17 @@ go install github.com/petersr/attn@latest
 # Basic notification
 attn send "Build complete"
 
-# With title and context
-attn send -t "My Project" -c "backend:main" "Tests passed"
-
-# Auto-context (default) — derives repo:branch from git
-attn send -t "Claude Code" "Done responding"
+# With templated title
+attn send -t "{{.Repo}}" "Build complete"
 
 # Critical urgency
 attn send -u critical "Build FAILED"
 
 # Custom timeout (ms)
 attn send -T 10000 "Deployment complete"
+
+# Environment variable in message
+attn send -t '{{env "USER"}}' "Task done"
 ```
 
 ### Commands
@@ -58,11 +58,9 @@ attn version                     Print version
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--title` | `-t` | `Notification` | Notification title |
+| `--title` | `-t` | `Notification` | Notification title (supports Go templates) |
 | `--urgency` | `-u` | `normal` | `low`, `normal`, or `critical` |
 | `--timeout` | `-T` | `5000` | Display timeout in milliseconds |
-| `--context` | `-c` | `auto` | Context string, or `auto` to derive from git |
-| `--no-context` | | `false` | Disable context entirely |
 
 ### Global flags
 
@@ -75,8 +73,8 @@ attn version                     Print version
 Create `~/.config/attn/config.toml`:
 
 ```toml
-[context]
-mode = "auto"  # "auto", "none", or a fixed string
+[format]
+prefix = "[{{.Repo}}:{{.Branch}}] "  # prepended to every message body (default: empty)
 
 [desktop]
 when = "active"  # default: fire when screen is on and you're not looking at the source terminal
@@ -116,6 +114,20 @@ when = "never"  # enable on remote machines to relay notifications back
 | `always` | Fire unconditionally |
 
 Relay is a regular channel — it participates in the `when` condition system and supports chaining across multiple machines. See [Remote Relay](docs/remote-relay.md).
+
+### Template variables
+
+Title, message body, and `format.prefix` all support Go `text/template` syntax:
+
+| Variable | Description |
+|----------|-------------|
+| `{{.Dir}}` | Basename of current working directory |
+| `{{.Path}}` | Full CWD path |
+| `{{.Repo}}` | Git repo name (basename of git toplevel) |
+| `{{.Branch}}` | Git branch name |
+| `{{env "VAR"}}` | Environment variable lookup |
+
+Example: with `prefix = "[{{.Repo}}:{{.Branch}}] "` in your config, running `attn send "done"` in a git repo produces the body `[myrepo:main] done`.
 
 **Fail-safe behavior:**
 - `active` channels **fail open** — if screen state can't be detected, they fire anyway

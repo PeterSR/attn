@@ -5,8 +5,8 @@ attn is configured via a TOML file at `~/.config/attn/config.toml`. If the file 
 ## Full example
 
 ```toml
-[context]
-mode = "auto"  # "auto", "none", or a fixed string
+[format]
+prefix = "[{{.Repo}}:{{.Branch}}] "  # prepended to every message body (default: empty)
 
 [desktop]
 when = "active"
@@ -112,18 +112,28 @@ Migration rules when only `enabled` is set:
 | pushover | `when = "always"` | `when = "never"` |
 | webhook | `when = "always"` | `when = "never"` |
 
-## Context
+## Format
 
 ```toml
-[context]
-mode = "auto"  # default
+[format]
+prefix = "[{{.Repo}}:{{.Branch}}] "
 ```
 
-- `auto` — derives `repo:branch` from git (200ms timeout), falls back to directory name
-- `none` — no context appended
-- Any other string — used as-is
+The `prefix` template is rendered and prepended to every notification body. Default is empty (no prefix).
 
-Context can also be overridden per-invocation with `--context` or disabled with `--no-context`.
+### Template variables
+
+Title (`--title`), message body, and `format.prefix` all support Go [`text/template`](https://pkg.go.dev/text/template) syntax:
+
+| Variable | Description |
+|----------|-------------|
+| `{{.Dir}}` | Basename of current working directory |
+| `{{.Path}}` | Full CWD path |
+| `{{.Repo}}` | Git repo name (basename of git toplevel, 200ms timeout) |
+| `{{.Branch}}` | Git branch name |
+| `{{env "VAR"}}` | Environment variable lookup |
+
+If a template fails to parse or execute, the literal string is used unchanged and a warning is printed to stderr.
 
 ## Relay (channel)
 

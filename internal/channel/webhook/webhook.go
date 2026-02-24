@@ -29,11 +29,8 @@ func (c *Channel) Name() string { return "webhook" }
 func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
 	payload := map[string]string{
 		"title":   n.Title,
-		"body":    n.FormatBody(),
+		"body":    n.Body,
 		"urgency": string(n.Urgency),
-	}
-	if n.Context != "" {
-		payload["context"] = n.Context
 	}
 
 	data, err := json.Marshal(payload)

@@ -23,10 +23,8 @@ func New() *Channel {
 func (c *Channel) Name() string { return "desktop" }
 
 func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
-	body := n.FormatBody()
-
 	// Escape double quotes for AppleScript strings.
-	escBody := strings.ReplaceAll(body, `"`, `\"`)
+	escBody := strings.ReplaceAll(n.Body, `"`, `\"`)
 	escTitle := strings.ReplaceAll(n.Title, `"`, `\"`)
 
 	script := fmt.Sprintf(`display notification "%s" with title "%s"`, escBody, escTitle)

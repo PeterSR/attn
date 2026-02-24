@@ -24,10 +24,8 @@ func New() *Channel {
 func (c *Channel) Name() string { return "desktop" }
 
 func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
-	body := n.FormatBody()
-
 	// Escape single quotes for PowerShell strings.
-	escBody := strings.ReplaceAll(body, "'", "''")
+	escBody := strings.ReplaceAll(n.Body, "'", "''")
 	escTitle := strings.ReplaceAll(n.Title, "'", "''")
 
 	// Try BurntToast first (richer notifications).

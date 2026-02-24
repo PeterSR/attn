@@ -24,8 +24,6 @@ func New(token, userKey string) *Channel {
 func (c *Channel) Name() string { return "pushover" }
 
 func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
-	body := n.FormatBody()
-
 	priority := "0"
 	switch n.Urgency {
 	case notification.UrgencyLow:
@@ -38,7 +36,7 @@ func (c *Channel) Send(ctx context.Context, n notification.Notification) error {
 		"token":    {c.token},
 		"user":     {c.userKey},
 		"title":    {n.Title},
-		"message":  {body},
+		"message":  {n.Body},
 		"priority": {priority},
 	}
 
