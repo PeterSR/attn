@@ -48,8 +48,8 @@ func (s *SendCmd) Run(globals *CLI) error {
 		return nil
 	}
 
-	// Evaluate screen state once.
-	state := channel.DetectScreenState(entries)
+	// Evaluate screen state once (hops=0 for direct send).
+	state := channel.DetectScreenState(entries, 0)
 
 	if err := channel.DispatchFiltered(context.Background(), entries, state, n); err != nil {
 		fmt.Fprintf(os.Stderr, "attn: %v\n", err)

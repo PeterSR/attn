@@ -102,6 +102,9 @@ func (m *Manager) execSSH(ctx context.Context, cfg config.TunnelConfig) error {
 		log.Printf("tunnel %q: inferred remote socket path: %s", cfg.Name, remoteSocket)
 	}
 
+	// Remove stale socket on the remote before binding.
+	m.removeRemoteSocket(ctx, cfg, remoteSocket)
+
 	// Build SSH args.
 	args := []string{
 		"-N", // No remote command
@@ -126,7 +129,37 @@ func (m *Manager) execSSH(ctx context.Context, cfg config.TunnelConfig) error {
 	args = append(args, dest)
 
 	cmd := exec.CommandContext(ctx, "ssh", args...)
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil && len(out) > 0 {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return err
+}
+
+// removeRemoteSocket removes a stale socket file on the remote machine.
+// Errors are logged but not fatal — the tunnel will fail with a clear
+// error if the socket still can't be bound.
+func (m *Manager) removeRemoteSocket(ctx context.Context, cfg config.TunnelConfig, socketPath string) {
+	args := []string{
+		"-o", "ConnectTimeout=10",
+	}
+
+	if cfg.IdentityFile != "" {
+		idFile := cfg.IdentityFile
+		if strings.HasPrefix(idFile, "~/") {
+			idFile = expandHome(idFile)
+		}
+		args = append(args, "-i", idFile)
+	}
+
+	dest := cfg.Host
+	if cfg.User != "" {
+		dest = cfg.User + "@" + cfg.Host
+	}
+	args = append(args, dest, "rm", "-f", socketPath)
+
+	cmd := exec.CommandContext(ctx, "ssh", args...)
+	_ = cmd.Run()
 }
 
 // resolveRemoteUID runs a quick SSH command to determine the remote user's UID.

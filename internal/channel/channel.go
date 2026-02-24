@@ -73,8 +73,10 @@ func ShouldFire(when When, state ScreenState) bool {
 }
 
 // DetectScreenState evaluates screen and focus state once. Only performs
-// detection if at least one channel entry needs it.
-func DetectScreenState(entries []Entry) ScreenState {
+// detection if at least one channel entry needs it. When hops > 0, the
+// notification arrived via relay and process-tree focus detection is
+// skipped — the local process tree is irrelevant for remote notifications.
+func DetectScreenState(entries []Entry, hops int) ScreenState {
 	needsDetection := false
 	for _, e := range entries {
 		if e.When == WhenActive || e.When == WhenIdle {
@@ -92,8 +94,9 @@ func DetectScreenState(entries []Entry) ScreenState {
 		Idle:        screenState == screen.StateIdle,
 	}
 
-	// Only check process tree if screen is active and an "active" channel exists.
-	if !state.Idle && state.DetectionOK {
+	// Only check process tree for locally-originated notifications (hops == 0).
+	// For relayed notifications, the local process tree is irrelevant.
+	if hops == 0 && !state.Idle && state.DetectionOK {
 		needsProcessTree := false
 		for _, e := range entries {
 			if e.When == WhenActive {

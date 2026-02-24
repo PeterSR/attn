@@ -67,7 +67,7 @@ func runServer(cfg config.Config, socketPath string) error {
 		SocketPath: socketPath,
 		DispatchFunc: func(ctx context.Context, n notification.Notification, hops int) error {
 			entries := buildChannelEntries(cfg, hops)
-			state := channel.DetectScreenState(entries)
+			state := channel.DetectScreenState(entries, hops)
 			return channel.DispatchFiltered(ctx, entries, state, n)
 		},
 	}
