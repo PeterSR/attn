@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// FocusedWindowInfo returns the name of the frontmost application on macOS.
+// PID is not available via osascript, so only Class is set.
+func FocusedWindowInfo() FocusInfo {
+	return FocusInfo{Class: FocusedWindow()}
+}
+
 // FocusedWindow returns the name of the frontmost application on macOS.
 func FocusedWindow() string {
 	cmd := exec.Command("osascript", "-e",

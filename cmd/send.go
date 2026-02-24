@@ -18,17 +18,17 @@ import (
 	"github.com/petersr/attn/internal/config"
 	"github.com/petersr/attn/internal/focus"
 	"github.com/petersr/attn/internal/notification"
+	"github.com/petersr/attn/internal/screen"
 )
 
 // SendCmd is the default command that sends a notification.
 type SendCmd struct {
-	Title          string   `short:"t" default:"Notification" help:"Notification title."`
-	Urgency        string   `short:"u" default:"normal" enum:"low,normal,critical" help:"Urgency level."`
-	Timeout        int      `short:"T" default:"5000" help:"Timeout in milliseconds."`
-	Context        string   `short:"c" default:"auto" help:"Context identifier (repo/branch/agent). Use 'auto' to derive from git/PWD."`
-	NoContext      bool     `help:"Disable context entirely."`
-	SkipIfFocused  string   `help:"Regex: suppress notification if focused window matches."`
-	Message        []string `arg:"" optional:"" help:"Notification message body."`
+	Title     string   `short:"t" default:"Notification" help:"Notification title."`
+	Urgency   string   `short:"u" default:"normal" enum:"low,normal,critical" help:"Urgency level."`
+	Timeout   int      `short:"T" default:"5000" help:"Timeout in milliseconds."`
+	Context   string   `short:"c" default:"auto" help:"Context identifier (repo/branch/agent). Use 'auto' to derive from git/PWD."`
+	NoContext bool     `help:"Disable context entirely."`
+	Message   []string `arg:"" optional:"" help:"Notification message body."`
 }
 
 func (s *SendCmd) Run(globals *CLI) error {
@@ -36,11 +36,6 @@ func (s *SendCmd) Run(globals *CLI) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "attn: warning: config load: %v\n", err)
 		cfg = config.Default()
-	}
-
-	// Focus suppression.
-	if focus.ShouldSuppress(s.SkipIfFocused) {
-		return nil
 	}
 
 	// Resolve context.
@@ -66,14 +61,17 @@ func (s *SendCmd) Run(globals *CLI) error {
 		}
 	}
 
-	// Build enabled channels.
-	channels := buildChannels(cfg)
-	if len(channels) == 0 {
-		fmt.Fprintf(os.Stderr, "attn: no channels enabled. Message: %s — %s\n", n.Title, n.FormatBody())
+	// Build channel entries with When conditions.
+	entries := buildChannelEntries(cfg)
+	if len(entries) == 0 {
+		fmt.Fprintf(os.Stderr, "attn: no channels configured. Message: %s — %s\n", n.Title, n.FormatBody())
 		return nil
 	}
 
-	if err := channel.Dispatch(context.Background(), channels, n); err != nil {
+	// Evaluate screen state once.
+	state := detectScreenState(entries)
+
+	if err := channel.DispatchFiltered(context.Background(), entries, state, n); err != nil {
 		fmt.Fprintf(os.Stderr, "attn: %v\n", err)
 	}
 	return nil
@@ -95,26 +93,78 @@ func (s *SendCmd) resolveContext(cfg config.Config) string {
 	return autocontext.Derive()
 }
 
-func buildChannels(cfg config.Config) []channel.Channel {
-	var channels []channel.Channel
+func buildChannelEntries(cfg config.Config) []channel.Entry {
+	var entries []channel.Entry
 
-	if cfg.DesktopEnabled() {
-		channels = append(channels, desktop.New())
+	if cfg.Desktop.When != config.WhenNever {
+		entries = append(entries, channel.Entry{
+			Channel: desktop.New(),
+			When:    channel.When(cfg.Desktop.When),
+		})
 	}
-	if cfg.BellEnabled() {
-		channels = append(channels, bell.New())
+	if cfg.Bell.When != config.WhenNever {
+		entries = append(entries, channel.Entry{
+			Channel: bell.New(),
+			When:    channel.When(cfg.Bell.When),
+		})
 	}
-	if cfg.Ntfy.Enabled && cfg.Ntfy.Topic != "" {
-		channels = append(channels, ntfy.New(cfg.Ntfy.Server, cfg.Ntfy.Topic, cfg.Ntfy.Token))
+	if cfg.Ntfy.When != config.WhenNever && cfg.Ntfy.Topic != "" {
+		entries = append(entries, channel.Entry{
+			Channel: ntfy.New(cfg.Ntfy.Server, cfg.Ntfy.Topic, cfg.Ntfy.Token),
+			When:    channel.When(cfg.Ntfy.When),
+		})
 	}
-	if cfg.Pushover.Enabled && cfg.Pushover.Token != "" && cfg.Pushover.UserKey != "" {
-		channels = append(channels, pushover.New(cfg.Pushover.Token, cfg.Pushover.UserKey))
+	if cfg.Pushover.When != config.WhenNever && cfg.Pushover.Token != "" && cfg.Pushover.UserKey != "" {
+		entries = append(entries, channel.Entry{
+			Channel: pushover.New(cfg.Pushover.Token, cfg.Pushover.UserKey),
+			When:    channel.When(cfg.Pushover.When),
+		})
 	}
-	if cfg.Webhook.Enabled && cfg.Webhook.URL != "" {
-		channels = append(channels, webhook.New(cfg.Webhook.URL, cfg.Webhook.Method, cfg.Webhook.Headers))
+	if cfg.Webhook.When != config.WhenNever && cfg.Webhook.URL != "" {
+		entries = append(entries, channel.Entry{
+			Channel: webhook.New(cfg.Webhook.URL, cfg.Webhook.Method, cfg.Webhook.Headers),
+			When:    channel.When(cfg.Webhook.When),
+		})
 	}
 
-	return channels
+	return entries
+}
+
+// detectScreenState evaluates screen and focus state once. Only performs
+// detection if at least one channel entry needs it.
+func detectScreenState(entries []channel.Entry) channel.ScreenState {
+	needsDetection := false
+	for _, e := range entries {
+		if e.When == channel.WhenActive || e.When == channel.WhenIdle {
+			needsDetection = true
+			break
+		}
+	}
+	if !needsDetection {
+		return channel.ScreenState{}
+	}
+
+	screenState := screen.Get()
+	state := channel.ScreenState{
+		DetectionOK: screenState != screen.StateUnknown,
+		Idle:        screenState == screen.StateIdle,
+	}
+
+	// Only check process tree if screen is active and an "active" channel exists.
+	if !state.Idle && state.DetectionOK {
+		needsProcessTree := false
+		for _, e := range entries {
+			if e.When == channel.WhenActive {
+				needsProcessTree = true
+				break
+			}
+		}
+		if needsProcessTree {
+			state.InProcessTree = focus.IsInProcessTree()
+		}
+	}
+
+	return state
 }
 
 func detectRelaySocket(cfg config.Config) string {

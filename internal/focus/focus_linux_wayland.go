@@ -8,12 +8,12 @@ import (
 	internaldbus "github.com/petersr/attn/internal/dbus"
 )
 
-// focusedWindowWayland queries the GNOME Shell "Focused Window D-Bus" extension.
-// Returns the wm_class of the focused window, or "" on failure.
-func focusedWindowWayland() string {
+// focusedWindowInfoWayland queries the GNOME Shell "Focused Window D-Bus" extension.
+// Returns the wm_class and PID of the focused window. Returns zero-value on failure.
+func focusedWindowInfoWayland() FocusInfo {
 	conn, err := internaldbus.SessionBus()
 	if err != nil {
-		return ""
+		return FocusInfo{}
 	}
 	defer conn.Close()
 
@@ -28,20 +28,25 @@ func focusedWindowWayland() string {
 		0,
 	).Store(&result)
 	if err != nil {
-		return ""
+		return FocusInfo{}
 	}
 
 	var data map[string]interface{}
 	if err := json.Unmarshal([]byte(result), &data); err != nil {
-		return ""
+		return FocusInfo{}
 	}
+
+	var info FocusInfo
 
 	if cls, ok := data["wm_class"].(string); ok && cls != "" {
-		return cls
-	}
-	if cls, ok := data["wm_class_instance"].(string); ok && cls != "" {
-		return cls
+		info.Class = cls
+	} else if cls, ok := data["wm_class_instance"].(string); ok && cls != "" {
+		info.Class = cls
 	}
 
-	return ""
+	if pid, ok := data["pid"].(float64); ok && pid > 0 {
+		info.PID = int(pid)
+	}
+
+	return info
 }

@@ -107,19 +107,19 @@ func runServer(cfg config.Config, socketPath string) error {
 func buildServerChannels(cfg config.Config) []channel.Channel {
 	var channels []channel.Channel
 
-	if cfg.DesktopEnabled() {
+	if cfg.Desktop.When != config.WhenNever {
 		channels = append(channels, desktop.New())
 	}
-	if cfg.BellEnabled() {
+	if cfg.Bell.When != config.WhenNever {
 		channels = append(channels, bell.New())
 	}
-	if cfg.Ntfy.Enabled && cfg.Ntfy.Topic != "" {
+	if cfg.Ntfy.When != config.WhenNever && cfg.Ntfy.Topic != "" {
 		channels = append(channels, ntfy.New(cfg.Ntfy.Server, cfg.Ntfy.Topic, cfg.Ntfy.Token))
 	}
-	if cfg.Pushover.Enabled && cfg.Pushover.Token != "" && cfg.Pushover.UserKey != "" {
+	if cfg.Pushover.When != config.WhenNever && cfg.Pushover.Token != "" && cfg.Pushover.UserKey != "" {
 		channels = append(channels, pushover.New(cfg.Pushover.Token, cfg.Pushover.UserKey))
 	}
-	if cfg.Webhook.Enabled && cfg.Webhook.URL != "" {
+	if cfg.Webhook.When != config.WhenNever && cfg.Webhook.URL != "" {
 		channels = append(channels, webhook.New(cfg.Webhook.URL, cfg.Webhook.Method, cfg.Webhook.Headers))
 	}
 

@@ -17,6 +17,8 @@ golangci-lint run ./...                     # Lint (same as CI, v1.64.8)
 make ci
 ```
 
+**After any significant change, update `README.md` and relevant files in `docs/` to reflect the new behavior, config options, or architecture.**
+
 Cross-compile (all targets use CGO_ENABLED=0):
 ```bash
 GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o attn-linux-arm64 .
@@ -38,9 +40,9 @@ type Channel interface {
     Send(ctx context.Context, n notification.Notification) error
 }
 ```
-`Dispatch()` fires all enabled channels concurrently with 10s per-channel timeout. Failures are collected, not fatal.
+`Dispatch()` fires all channels concurrently with 10s per-channel timeout. `DispatchFiltered()` evaluates `When` conditions against `ScreenState` before dispatching. Failures are collected, not fatal.
 
-Channels: `desktop` (D-Bus), `bell` (\a), `ntfy`, `pushover`, `webhook`, `remote` (Unix socket relay).
+Channels: `desktop` (D-Bus), `bell` (\a), `ntfy`, `pushover`, `webhook`, `remote` (Unix socket relay). Each channel has a `when` condition: `never`, `active`, `idle`, `always`.
 
 **Platform-specific code**: Uses Go build tag file suffixes (`_linux.go`, `_darwin.go`, `_windows.go`, `_other.go`). Linux is the primary platform with native D-Bus and X11 support. macOS and Windows files are experimental and marked as such in their header comments.
 
@@ -48,7 +50,11 @@ Channels: `desktop` (D-Bus), `bell` (\a), `ntfy`, `pushover`, `webhook`, `remote
 
 **D-Bus session bus** (`internal/dbus/session.go`): Helper with fallback logic — tries standard `DBUS_SESSION_BUS_ADDRESS` first, then constructs address from `$XDG_RUNTIME_DIR/bus`. Critical for non-interactive contexts (systemd services, cron, agent hooks).
 
-**Focus detection** (`internal/focus/`): Linux router tries Wayland (GNOME Shell D-Bus extension) then X11 (`jezek/xgbutil` EWMH/ICCCM). Returns empty string on failure — suppression only triggers on positive match.
+**Focus detection** (`internal/focus/`): Linux router tries Wayland (GNOME Shell D-Bus extension) then X11 (`jezek/xgbutil` EWMH/ICCCM). Returns `FocusInfo` with window class and PID. `IsInProcessTree()` compares the focused window's process ancestry with attn's own ancestry to detect if the user is looking at the source terminal.
+
+**Process tree** (`internal/proctree/`): Walks `/proc/<pid>/status` to build ancestor chains. `ShareAncestor()` checks if two PIDs share a common ancestor above PID 1. Linux-only; stubs on other platforms.
+
+**Screen idle detection** (`internal/screen/`): Queries D-Bus screensaver interfaces (`org.gnome.ScreenSaver`, `org.freedesktop.ScreenSaver`) to detect screen lock/idle state. Returns `StateActive`, `StateIdle`, or `StateUnknown`.
 
 **Remote relay**: `internal/relay/server.go` listens on Unix socket, `internal/channel/remote/client.go` sends to it. Wire format is JSON-lines (`internal/relay/protocol.go`). Auto-detected on remote machines via `$ATTN_SOCK` env var or `$SSH_CLIENT` + socket existence.
 
@@ -56,7 +62,7 @@ Channels: `desktop` (D-Bus), `bell` (\a), `ntfy`, `pushover`, `webhook`, `remote
 
 **Auto-context** (`internal/autocontext/`): Derives `repo:branch` from git with 200ms timeout. Falls back to directory basename. Git not installed is not an error.
 
-**Config** (`internal/config/`): TOML at `~/.config/attn/config.toml`. Desktop and bell enabled by default (use `*bool` for tri-state). Missing config file is not an error.
+**Config** (`internal/config/`): TOML at `~/.config/attn/config.toml`. Each channel has a `when` field (`never`/`active`/`idle`/`always`). Desktop defaults to `active`, everything else to `never`. Old `enabled` bool is still accepted for backward compat and migrated to `when` in `Load()`. Missing config file is not an error.
 
 ## Release
 

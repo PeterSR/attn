@@ -6,9 +6,10 @@ A cross-platform notification tool that alerts you when long-running processes �
 
 ## Features
 
+- **Smart focus detection** — automatically suppresses notifications when you're looking at the terminal that triggered them (process-tree matching via X11 `_NET_WM_PID` / Wayland)
+- **Screen-aware routing** — send desktop notifications when active, push to your phone when the screen is locked
 - **Desktop notifications** — native D-Bus on Linux (no `notify-send` required), osascript on macOS
 - **Push notifications** — ntfy.sh, Pushover, generic webhooks (Slack, Discord, etc.)
-- **Focus suppression** — skip notifications when the relevant window is already focused
 - **Auto-context** — automatically includes repo name and git branch so you know *which* task finished
 - **Remote relay** — get notifications from remote servers via SSH socket forwarding
 - **Managed SSH tunnels** — auto-maintain tunnels to your remote machines
@@ -38,9 +39,6 @@ attn send -t "My Project" -c "backend:main" "Tests passed"
 # Auto-context (default) — derives repo:branch from git
 attn send -t "Claude Code" "Done responding"
 
-# Skip if a window is focused
-attn send --skip-if-focused "code|vscodium" "Done responding"
-
 # Critical urgency
 attn send -u critical "Build FAILED"
 
@@ -65,7 +63,6 @@ attn version                     Print version
 | `--timeout` | `-T` | `5000` | Display timeout in milliseconds |
 | `--context` | `-c` | `auto` | Context string, or `auto` to derive from git |
 | `--no-context` | | `false` | Disable context entirely |
-| `--skip-if-focused` | | | Regex: suppress if focused window matches |
 
 ### Global flags
 
@@ -82,30 +79,55 @@ Create `~/.config/attn/config.toml`:
 mode = "auto"  # "auto", "none", or a fixed string
 
 [desktop]
-enabled = true
+when = "active"  # default: fire when screen is on and you're not looking at the source terminal
 
 [bell]
-enabled = true
+when = "never"  # "never", "active", "idle", or "always"
 
 [ntfy]
-enabled = false
+when = "idle"  # fire when screen is locked — pushes to your phone
 server = "https://ntfy.sh"
 topic = "my-attn"
 # token = ""  # optional access token
 
 [pushover]
-enabled = false
+when = "never"
 # token = ""
 # user_key = ""
 
 [webhook]
-enabled = false
+when = "never"
 # url = "https://hooks.slack.com/services/..."
 # method = "POST"
 # headers = { "Content-Type" = "application/json" }
 ```
 
+### Channel conditions (`when`)
+
+| Value | Behavior |
+|-------|----------|
+| `never` | Channel is disabled (default for all channels except desktop) |
+| `active` | Fire when screen is on, unlocked, and the focused window is **not** in attn's process tree |
+| `idle` | Fire when screen is off or locked |
+| `always` | Fire unconditionally |
+
+**Fail-safe behavior:**
+- `active` channels **fail open** — if screen state can't be detected, they fire anyway
+- `idle` channels **fail closed** — if screen state can't be detected, they don't fire
+
 All channels fire concurrently. A failure in one channel does not affect others.
+
+### How focus detection works
+
+When a channel is set to `when = "active"`, attn walks its own process tree up through `/proc` to find the terminal that spawned it:
+
+```
+attn → bash (hook) → claude → bash (shell) → warp (PID 1234)
+```
+
+It then gets the focused window's PID (via X11 `_NET_WM_PID` or Wayland D-Bus) and checks if that PID is a direct ancestor in attn's chain. If it is (e.g., the focused window is the Warp terminal that spawned attn), the notification is suppressed — you're already looking at it.
+
+This means **no configuration is needed** for focus suppression. It works automatically when called from any context (Claude Code hooks, shell scripts, CI runners).
 
 ## Remote Notifications via SSH
 
@@ -182,27 +204,50 @@ Add to your [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/h
 ```json
 {
   "hooks": {
-    "notification": [
+    "Notification": [
       {
-        "type": "command",
-        "command": "attn send -t 'Claude Code' --skip-if-focused 'code|vscodium|cursor'"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "attn send -t 'Claude Code'"
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-The auto-context feature will include the repo and branch name in the notification automatically.
+With `when = "active"` (the default for desktop), notifications are automatically suppressed when you're looking at the terminal running Claude Code. No flags needed.
+
+To also get push notifications when your screen is locked, add ntfy to your config:
+
+```toml
+[ntfy]
+when = "idle"
+topic = "my-claude-notifications"
+```
 
 ## Platform Support
 
-| Platform | Desktop | Focus Detection | Relay/Tunnels | Push (ntfy, etc.) |
-|----------|---------|-----------------|---------------|-------------------|
-| **Linux** | D-Bus (native) | Wayland (GNOME) + X11 | Unix socket | HTTP |
-| **macOS** | osascript* | osascript* | Unix socket | HTTP |
-| **Windows** | PowerShell* | Not supported | Not supported | HTTP |
+| Platform | Desktop | Focus Detection | Screen Idle | Relay/Tunnels | Push (ntfy, etc.) |
+|----------|---------|-----------------|-------------|---------------|-------------------|
+| **Linux** | D-Bus (native) | Wayland (GNOME) + X11 | D-Bus ScreenSaver | Unix socket | HTTP |
+| **macOS** | osascript* | osascript* | Not yet | Unix socket | HTTP |
+| **Windows** | PowerShell* | Not supported | Not supported | Not supported | HTTP |
 
-\* **Experimental** — macOS and Windows desktop notification and focus detection support is untested. Push channels (ntfy, Pushover, webhook) and the terminal bell work on all platforms. Contributions welcome!
+\* **Experimental** — macOS and Windows desktop notification support is untested. Push channels (ntfy, Pushover, webhook) and the terminal bell work on all platforms. Contributions welcome!
+
+## Documentation
+
+See the [docs/](docs/) directory for detailed documentation:
+
+- [Configuration Reference](docs/configuration.md) — full config format, `when` semantics, migration guide
+- [Channels](docs/channels.md) — each notification channel explained
+- [Focus Detection](docs/focus-detection.md) — how process-tree matching works
+- [Screen Idle Detection](docs/screen-idle.md) — how screen lock/idle detection works
+- [Remote Relay](docs/remote-relay.md) — relay architecture, SSH tunnels, systemd setup
 
 ## Building
 

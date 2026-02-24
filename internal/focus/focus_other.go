@@ -2,8 +2,12 @@
 
 package focus
 
+// FocusedWindowInfo is a no-op on unsupported platforms.
+func FocusedWindowInfo() FocusInfo {
+	return FocusInfo{}
+}
+
 // FocusedWindow is a no-op on unsupported platforms.
-// Returns "" so focus suppression is never triggered.
 func FocusedWindow() string {
 	return ""
 }
