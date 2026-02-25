@@ -271,3 +271,64 @@ func TestGetInvalidKey(t *testing.T) {
 		t.Fatal("expected error for unknown key")
 	}
 }
+
+func TestSetProcessLabel(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	if err := Set(path, "processes.code", "VS Code"); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	if !strings.Contains(got, "[processes]") {
+		t.Errorf("expected [processes] section, got:\n%s", got)
+	}
+	if !strings.Contains(got, `code = "VS Code"`) {
+		t.Errorf("expected code = \"VS Code\", got:\n%s", got)
+	}
+}
+
+func TestGetProcessLabel(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	if err := Set(path, "processes.code", "VS Code"); err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := Get(path, "processes.code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "VS Code" {
+		t.Errorf("Get processes.code = %q, want %q", val, "VS Code")
+	}
+}
+
+func TestGetProcessLabelMissing(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	val, err := Get(path, "processes.nonexistent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if val != "" {
+		t.Errorf("Get processes.nonexistent = %q, want empty", val)
+	}
+}
+
+func TestSetProcessEmptyName(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	err := Set(path, "processes.", "label")
+	if err == nil {
+		t.Fatal("expected error for empty process name")
+	}
+}

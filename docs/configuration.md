@@ -25,6 +25,7 @@ attn config path                # Print the config file path
 | `pushover.when`, `pushover.token`, `pushover.user_key` | same |
 | `webhook.when`, `webhook.url`, `webhook.method` | same |
 | `relay.when`, `relay.socket_path` | same |
+| `processes.<name>` | any string (friendly label for a process comm name) |
 
 ### Examples
 
@@ -36,6 +37,11 @@ attn config set ntfy.when idle
 # Check effective values
 attn config get ntfy.server     # → https://ntfy.sh (default)
 attn config get desktop.when    # → active (default)
+
+# Add process labels (use 'attn proctree' to discover comm names)
+attn config set processes.code "VS Code"
+attn config set processes.warp "Warp"
+attn config get processes.code  # → VS Code
 ```
 
 ## Full example

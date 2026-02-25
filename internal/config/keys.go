@@ -78,6 +78,18 @@ var keys = map[string]keyInfo{
 
 // Get loads the config and returns the effective value for the given key.
 func Get(path, key string) (string, error) {
+	// Dynamic key: processes.<name>
+	if name, ok := strings.CutPrefix(key, "processes."); ok {
+		if name == "" {
+			return "", fmt.Errorf("processes key requires a name: processes.<name>")
+		}
+		cfg, err := Load(path)
+		if err != nil {
+			return "", err
+		}
+		return cfg.Processes[name], nil
+	}
+
 	ki, ok := keys[key]
 	if !ok {
 		return "", unknownKeyError(key)
@@ -92,6 +104,14 @@ func Get(path, key string) (string, error) {
 // LookupKey returns the section and TOML key name for a dotted key,
 // along with an optional validation function. Returns an error for unknown keys.
 func LookupKey(key string) (section, tomlKey string, validate func(string) error, err error) {
+	// Dynamic key: processes.<name>
+	if name, ok := strings.CutPrefix(key, "processes."); ok {
+		if name == "" {
+			return "", "", nil, fmt.Errorf("processes key requires a name: processes.<name>")
+		}
+		return "processes", name, nil, nil
+	}
+
 	ki, ok := keys[key]
 	if !ok {
 		return "", "", nil, unknownKeyError(key)
@@ -117,5 +137,5 @@ func validateWhen(v string) error {
 }
 
 func unknownKeyError(key string) error {
-	return fmt.Errorf("unknown key %q\nValid keys:\n  %s", key, strings.Join(ValidKeys(), "\n  "))
+	return fmt.Errorf("unknown key %q\nValid keys:\n  %s\n  processes.<name>", key, strings.Join(ValidKeys(), "\n  "))
 }
