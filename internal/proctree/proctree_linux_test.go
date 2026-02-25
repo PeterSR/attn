@@ -52,3 +52,67 @@ func TestIsAncestorReversed(t *testing.T) {
 		t.Error("IsAncestor(parent, self) = true, want false")
 	}
 }
+
+func TestAncestorsNamedSelf(t *testing.T) {
+	chain := AncestorsNamed(os.Getpid())
+	if len(chain) == 0 {
+		t.Fatal("AncestorsNamed(self) returned empty chain")
+	}
+	if chain[0].PID != os.Getpid() {
+		t.Errorf("first entry PID = %d, want %d (self)", chain[0].PID, os.Getpid())
+	}
+	for i, p := range chain {
+		if p.Name == "" {
+			t.Errorf("entry %d (PID %d) has empty name", i, p.PID)
+		}
+	}
+}
+
+func TestMatchKnown(t *testing.T) {
+	chain := []ProcessInfo{
+		{PID: 100, Name: "attn"},
+		{PID: 99, Name: "bash"},
+		{PID: 98, Name: "node"},
+		{PID: 97, Name: "code"},
+		{PID: 1, Name: "systemd"},
+	}
+	known := map[string]string{
+		"code": "VS Code",
+		"warp": "Warp",
+	}
+
+	got := MatchKnown(chain, known)
+	if got != "VS Code" {
+		t.Errorf("MatchKnown = %q, want %q", got, "VS Code")
+	}
+}
+
+func TestMatchKnownSkipsSelf(t *testing.T) {
+	chain := []ProcessInfo{
+		{PID: 100, Name: "code"}, // self — should be skipped
+		{PID: 99, Name: "bash"},
+	}
+	known := map[string]string{
+		"code": "VS Code",
+	}
+
+	got := MatchKnown(chain, known)
+	if got != "" {
+		t.Errorf("MatchKnown should skip self, got %q", got)
+	}
+}
+
+func TestMatchKnownNoMatch(t *testing.T) {
+	chain := []ProcessInfo{
+		{PID: 100, Name: "attn"},
+		{PID: 99, Name: "bash"},
+	}
+	known := map[string]string{
+		"code": "VS Code",
+	}
+
+	got := MatchKnown(chain, known)
+	if got != "" {
+		t.Errorf("MatchKnown = %q, want empty", got)
+	}
+}

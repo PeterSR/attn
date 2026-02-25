@@ -10,6 +10,7 @@ import (
 	"github.com/petersr/attn/internal/channel"
 	"github.com/petersr/attn/internal/config"
 	"github.com/petersr/attn/internal/notification"
+	"github.com/petersr/attn/internal/proctree"
 	"github.com/petersr/attn/internal/render"
 )
 
@@ -28,8 +29,12 @@ func (s *SendCmd) Run(globals *CLI) error {
 		cfg = config.Default()
 	}
 
-	// Gather context and render templates.
+	// Gather context and resolve process label.
 	info := autocontext.Gather()
+	if len(cfg.Processes) > 0 {
+		chain := proctree.AncestorsNamed(os.Getpid())
+		info.Process = proctree.MatchKnown(chain, cfg.Processes)
+	}
 	title := render.Render(s.Title, info)
 	body := render.Render(strings.Join(s.Message, " "), info)
 	prefix := render.Render(cfg.Format.Prefix, info)

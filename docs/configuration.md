@@ -71,6 +71,11 @@ headers = { "Content-Type" = "application/json" }
 when = "always"
 # socket_path = ""  # default: $XDG_RUNTIME_DIR/attn.sock
 
+[processes]
+code = "VS Code"
+warp = "Warp"
+alacritty = "Alacritty"
+
 [serve]
 socket_path = "/run/user/1000/attn.sock"
 
@@ -167,9 +172,36 @@ Title (`--title`), message body, and `format.prefix` all support Go [`text/templ
 | `{{.Path}}` | Full CWD path |
 | `{{.Repo}}` | Git repo name (basename of git toplevel, 200ms timeout) |
 | `{{.Branch}}` | Git branch name |
+| `{{.Process}}` | Friendly label of the parent process (from `[processes]` config) |
 | `{{env "VAR"}}` | Environment variable lookup |
 
 If a template fails to parse or execute, the literal string is used unchanged and a warning is printed to stderr.
+
+## Process detection
+
+The `[processes]` section maps Linux process comm names to friendly labels. When `attn send` runs, it walks its own process ancestor chain (via `/proc`) and matches against the configured names. The first match (closest ancestor, skipping self) populates the `{{.Process}}` template variable.
+
+```toml
+[processes]
+code = "VS Code"
+warp = "Warp"
+alacritty = "Alacritty"
+kitty = "kitty"
+```
+
+Use `attn proctree` to discover the comm names in your ancestor chain:
+
+```bash
+$ attn proctree
+PID       NAME             LABEL
+48291     attn
+48290     bash
+48115     node
+47903     code             VS Code
+1         systemd
+```
+
+The comm name is the `Name:` field from `/proc/<pid>/status` — typically the executable basename, truncated to 15 characters. The `[processes]` map is not managed via `attn config set`; edit the TOML file directly.
 
 ## Relay (channel)
 

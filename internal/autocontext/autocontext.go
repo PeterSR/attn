@@ -13,10 +13,11 @@ const gitTimeout = 200 * time.Millisecond
 
 // Info holds structured context about the current environment.
 type Info struct {
-	Dir    string // basename of CWD
-	Path   string // full CWD path
-	Repo   string // git repo name (basename of git toplevel)
-	Branch string // git branch name
+	Dir     string // basename of CWD
+	Path    string // full CWD path
+	Repo    string // git repo name (basename of git toplevel)
+	Branch  string // git branch name
+	Process string // friendly label of the parent process (from config)
 }
 
 // Gather collects environment context (CWD, git repo/branch).

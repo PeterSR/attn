@@ -54,6 +54,7 @@ attn serve [flags]               Start the relay server
 attn config set <key> <value>    Set a config value
 attn config get <key>            Get a config value
 attn config path                 Print config file path
+attn proctree [--json]           Show the process ancestor chain
 attn version                     Print version
 ```
 
@@ -124,6 +125,11 @@ when = "never"
 [relay]
 when = "never"  # enable on remote machines to relay notifications back
 # socket_path = ""  # default: $XDG_RUNTIME_DIR/attn.sock
+
+[processes]  # map process comm names to friendly labels for {{.Process}}
+code = "VS Code"
+warp = "Warp"
+# Use 'attn proctree' to discover process names in your ancestor chain
 ```
 
 ### Channel conditions (`when`)
@@ -147,6 +153,7 @@ Title, message body, and `format.prefix` all support Go `text/template` syntax:
 | `{{.Path}}` | Full CWD path |
 | `{{.Repo}}` | Git repo name (basename of git toplevel) |
 | `{{.Branch}}` | Git branch name |
+| `{{.Process}}` | Friendly label of the parent process (from `[processes]` config) |
 | `{{env "VAR"}}` | Environment variable lookup |
 
 Example: with `prefix = "[{{.Repo}}:{{.Branch}}] "` in your config, running `attn send "done"` in a git repo produces the body `[myrepo:main] done`.

@@ -28,14 +28,15 @@ func (w When) Valid() bool {
 }
 
 type Config struct {
-	Format   FormatConfig   `toml:"format"`
-	Desktop  DesktopConfig  `toml:"desktop"`
-	Bell     BellConfig     `toml:"bell"`
-	Ntfy     NtfyConfig     `toml:"ntfy"`
-	Pushover PushoverConfig `toml:"pushover"`
-	Webhook  WebhookConfig  `toml:"webhook"`
-	Relay    RelayConfig    `toml:"relay"`
-	Serve    ServeConfig    `toml:"serve"`
+	Format    FormatConfig      `toml:"format"`
+	Desktop   DesktopConfig     `toml:"desktop"`
+	Bell      BellConfig        `toml:"bell"`
+	Ntfy      NtfyConfig        `toml:"ntfy"`
+	Pushover  PushoverConfig    `toml:"pushover"`
+	Webhook   WebhookConfig     `toml:"webhook"`
+	Relay     RelayConfig       `toml:"relay"`
+	Serve     ServeConfig       `toml:"serve"`
+	Processes map[string]string `toml:"processes"`
 }
 
 type FormatConfig struct {

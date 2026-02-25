@@ -8,10 +8,11 @@ import (
 
 func TestRenderVariables(t *testing.T) {
 	info := autocontext.Info{
-		Dir:    "myproject",
-		Path:   "/home/user/myproject",
-		Repo:   "myrepo",
-		Branch: "main",
+		Dir:     "myproject",
+		Path:    "/home/user/myproject",
+		Repo:    "myrepo",
+		Branch:  "main",
+		Process: "VS Code",
 	}
 
 	tests := []struct {
@@ -23,6 +24,8 @@ func TestRenderVariables(t *testing.T) {
 		{"path", "{{.Path}}", "/home/user/myproject"},
 		{"repo", "{{.Repo}}", "myrepo"},
 		{"branch", "{{.Branch}}", "main"},
+		{"process", "{{.Process}}", "VS Code"},
+		{"process in title", "{{.Process}}: done", "VS Code: done"},
 		{"combined", "[{{.Repo}}:{{.Branch}}] ", "[myrepo:main] "},
 		{"plain text", "hello world", "hello world"},
 		{"empty", "", ""},
