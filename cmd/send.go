@@ -16,11 +16,12 @@ import (
 
 // SendCmd is the default command that sends a notification.
 type SendCmd struct {
-	Title   string   `short:"t" default:"Notification" help:"Notification title (supports Go templates: {{.Repo}}, {{.Branch}}, etc.)."`
-	Urgency string   `short:"u" default:"normal" enum:"low,normal,critical" help:"Urgency level."`
-	Timeout int      `short:"T" default:"5000" help:"Timeout in milliseconds."`
-	Verbose bool     `short:"v" help:"Print channel evaluation details to stderr."`
-	Message []string `arg:"" optional:"" help:"Notification message body (supports Go templates)."`
+	Title   string            `short:"t" default:"Notification" help:"Notification title (supports Go templates: {{.Repo}}, {{.Branch}}, etc.)."`
+	Urgency string            `short:"u" default:"normal" enum:"low,normal,critical" help:"Urgency level."`
+	Timeout int               `short:"T" default:"5000" help:"Timeout in milliseconds."`
+	Verbose bool              `short:"v" help:"Print channel evaluation details to stderr."`
+	When    map[string]string `short:"w" help:"Override when condition per channel (e.g. desktop=always)."`
+	Message []string          `arg:"" optional:"" help:"Notification message body (supports Go templates)."`
 }
 
 func (s *SendCmd) Run(globals *CLI) error {
@@ -28,6 +29,10 @@ func (s *SendCmd) Run(globals *CLI) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "attn: warning: config load: %v\n", err)
 		cfg = config.Default()
+	}
+
+	if err := applyWhenOverrides(&cfg, s.When); err != nil {
+		return err
 	}
 
 	// Gather context and resolve process label.
@@ -80,6 +85,33 @@ func (s *SendCmd) Run(globals *CLI) error {
 	} else {
 		if err := channel.DispatchFiltered(context.Background(), entries, state, n); err != nil {
 			fmt.Fprintf(os.Stderr, "attn: %v\n", err)
+		}
+	}
+	return nil
+}
+
+// applyWhenOverrides applies ad-hoc --when overrides to the loaded config.
+func applyWhenOverrides(cfg *config.Config, overrides map[string]string) error {
+	for ch, val := range overrides {
+		w := config.When(val)
+		if !w.Valid() || w == "" {
+			return fmt.Errorf("invalid when value %q for channel %q (valid: never, active, idle, always)", val, ch)
+		}
+		switch ch {
+		case "desktop":
+			cfg.Desktop.When = w
+		case "bell":
+			cfg.Bell.When = w
+		case "ntfy":
+			cfg.Ntfy.When = w
+		case "pushover":
+			cfg.Pushover.When = w
+		case "webhook":
+			cfg.Webhook.When = w
+		case "relay":
+			cfg.Relay.When = w
+		default:
+			return fmt.Errorf("unknown channel %q (valid: desktop, bell, ntfy, pushover, webhook, relay)", ch)
 		}
 	}
 	return nil

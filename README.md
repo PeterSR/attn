@@ -44,6 +44,10 @@ attn send -T 10000 "Deployment complete"
 
 # Environment variable in message
 attn send -t '{{env "USER"}}' "Task done"
+
+# Override when condition per channel (ad-hoc)
+attn send -w bell=always "Build complete"
+attn send -w desktop=always -w bell=always "urgent"
 ```
 
 ### Commands

@@ -98,6 +98,21 @@ The relay channel participates in the `when` condition system like any other cha
 
 See [Remote Relay](remote-relay.md) for the full architecture.
 
+## Ad-hoc overrides
+
+The `--when` (`-w`) flag on `attn send` overrides the `when` condition for individual channels without modifying the config file. This is useful for one-off notifications through channels that are normally disabled.
+
+```bash
+# Ring the bell this one time, even if bell.when = "never" in config
+attn send -w bell=always "Build complete"
+
+# Override multiple channels at once
+attn send -w desktop=always -w bell=always "urgent notification"
+```
+
+Valid channel names: `desktop`, `bell`, `ntfy`, `pushover`, `webhook`, `relay`.
+Valid when values: `never`, `active`, `idle`, `always`.
+
 ## Channel dispatch
 
 All enabled channels fire concurrently with a 10-second per-channel timeout. Screen state (active/idle) and process-tree focus are evaluated once before dispatch, not per-channel.
