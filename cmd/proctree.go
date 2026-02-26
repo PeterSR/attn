@@ -8,11 +8,13 @@ import (
 
 	"github.com/petersr/attn/internal/config"
 	"github.com/petersr/attn/internal/proctree"
+	proctreeui "github.com/petersr/attn/internal/tui/proctree"
 )
 
 // ProctreeCmd shows the process ancestor chain.
 type ProctreeCmd struct {
-	JSON bool `help:"Output as JSON." default:"false"`
+	JSON        bool `help:"Output as JSON." default:"false"`
+	Interactive bool `help:"Interactive mode: browse ancestors and assign labels." short:"i" default:"false"`
 }
 
 type proctreeEntry struct {
@@ -40,6 +42,19 @@ func (p *ProctreeCmd) Run(globals *CLI) error {
 			label = cfg.Processes[pi.Name]
 		}
 		entries[i] = proctreeEntry{PID: pi.PID, Name: pi.Name, Label: label}
+	}
+
+	if p.Interactive {
+		uiEntries := make([]proctreeui.Entry, len(entries))
+		for i, e := range entries {
+			uiEntries[i] = proctreeui.Entry{
+				PID:       e.PID,
+				Name:      e.Name,
+				Label:     e.Label,
+				OrigLabel: e.Label,
+			}
+		}
+		return proctreeui.Run(uiEntries, globals.ConfigFile)
 	}
 
 	if p.JSON {

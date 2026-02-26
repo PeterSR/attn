@@ -42,6 +42,9 @@ attn config get desktop.when    # → active (default)
 attn config set processes.code "VS Code"
 attn config set processes.warp "Warp"
 attn config get processes.code  # → VS Code
+
+# Or use interactive mode to browse and label processes
+attn proctree -i
 ```
 
 ## Full example
@@ -195,7 +198,7 @@ alacritty = "Alacritty"
 kitty = "kitty"
 ```
 
-Use `attn proctree` to discover the comm names in your ancestor chain:
+Use `attn proctree` to discover the comm names in your ancestor chain, or `attn proctree -i` to browse and assign labels interactively:
 
 ```bash
 $ attn proctree

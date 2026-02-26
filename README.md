@@ -54,7 +54,7 @@ attn serve [flags]               Start the relay server
 attn config set <key> <value>    Set a config value
 attn config get <key>            Get a config value
 attn config path                 Print config file path
-attn proctree [--json]           Show the process ancestor chain
+attn proctree [--json] [-i]      Show the process ancestor chain
 attn version                     Print version
 ```
 
@@ -129,7 +129,7 @@ when = "never"  # enable on remote machines to relay notifications back
 [processes]  # map process comm names to friendly labels for {{.Process}}
 code = "VS Code"
 warp = "Warp"
-# Use 'attn proctree' to discover process names in your ancestor chain
+# Use 'attn proctree' to discover names; 'attn proctree -i' to assign labels interactively
 ```
 
 ### Channel conditions (`when`)
