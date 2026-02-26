@@ -323,6 +323,37 @@ func TestGetProcessLabelMissing(t *testing.T) {
 	}
 }
 
+func TestSetMultipleProcessLabelsNoExtraBlankLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+
+	if err := Set(path, "processes.bash", "shell"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Set(path, "processes.vim", "editor"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Set(path, "processes.code", "VS Code"); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+
+	// Should not have consecutive blank lines within the section.
+	if strings.Contains(got, "\n\n") {
+		t.Errorf("unexpected blank line in output:\n%s", got)
+	}
+
+	want := "[processes]\nbash = \"shell\"\nvim = \"editor\"\ncode = \"VS Code\"\n"
+	if got != want {
+		t.Errorf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestSetProcessEmptyName(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")

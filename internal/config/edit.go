@@ -98,6 +98,7 @@ func insertLine(lines []string, at int, line string) []string {
 }
 
 func splitLines(s string) []string {
+	s = strings.TrimRight(s, "\n")
 	if s == "" {
 		return nil
 	}

@@ -19,6 +19,7 @@ type SendCmd struct {
 	Title   string   `short:"t" default:"Notification" help:"Notification title (supports Go templates: {{.Repo}}, {{.Branch}}, etc.)."`
 	Urgency string   `short:"u" default:"normal" enum:"low,normal,critical" help:"Urgency level."`
 	Timeout int      `short:"T" default:"5000" help:"Timeout in milliseconds."`
+	Verbose bool     `short:"v" help:"Print channel evaluation details to stderr."`
 	Message []string `arg:"" optional:"" help:"Notification message body (supports Go templates)."`
 }
 
@@ -57,8 +58,29 @@ func (s *SendCmd) Run(globals *CLI) error {
 	// Evaluate screen state once (hops=0 for direct send).
 	state := channel.DetectScreenState(entries, 0)
 
-	if err := channel.DispatchFiltered(context.Background(), entries, state, n); err != nil {
-		fmt.Fprintf(os.Stderr, "attn: %v\n", err)
+	if s.Verbose {
+		fmt.Fprintf(os.Stderr, "attn: screen: idle=%v inProcessTree=%v detectionOK=%v\n",
+			state.Idle, state.InProcessTree, state.DetectionOK)
+
+		results, err := channel.DispatchFilteredVerbose(context.Background(), entries, state, n)
+		for _, r := range results {
+			if r.Fired {
+				if r.Err != nil {
+					fmt.Fprintf(os.Stderr, "attn: %s(when=%s): error: %v\n", r.Name, r.When, r.Err)
+				} else {
+					fmt.Fprintf(os.Stderr, "attn: %s(when=%s): sent\n", r.Name, r.When)
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "attn: %s(when=%s): skipped (%s)\n", r.Name, r.When, r.Reason)
+			}
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "attn: %v\n", err)
+		}
+	} else {
+		if err := channel.DispatchFiltered(context.Background(), entries, state, n); err != nil {
+			fmt.Fprintf(os.Stderr, "attn: %v\n", err)
+		}
 	}
 	return nil
 }
