@@ -69,6 +69,8 @@ attn version                     Print version
 | `--title` | `-t` | `Notification` | Notification title (supports Go templates) |
 | `--urgency` | `-u` | `normal` | `low`, `normal`, or `critical` |
 | `--timeout` | `-T` | `5000` | Display timeout in milliseconds |
+| `--verbose` | `-v` | `false` | Print channel evaluation details to stderr |
+| `--when` | `-w` | | Override `when` condition per channel (e.g. `desktop=always`) |
 
 ### Global flags
 

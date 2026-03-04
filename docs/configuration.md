@@ -210,7 +210,7 @@ PID       NAME             LABEL
 1         systemd
 ```
 
-The comm name is the `Name:` field from `/proc/<pid>/status` — typically the executable basename, truncated to 15 characters. The `[processes]` map is not managed via `attn config set`; edit the TOML file directly.
+The comm name is the `Name:` field from `/proc/<pid>/status` — typically the executable basename, truncated to 15 characters.
 
 ## Relay (channel)
 
