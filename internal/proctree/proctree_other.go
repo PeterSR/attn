@@ -27,3 +27,8 @@ func MatchKnown(chain []ProcessInfo, known map[string]string) string {
 func IsAncestor(pid, possibleAncestor int) bool {
 	return false
 }
+
+// Cmdline is a no-op on non-Linux platforms.
+func Cmdline(pid int) string {
+	return ""
+}

@@ -37,6 +37,9 @@ type Config struct {
 	Relay     RelayConfig       `toml:"relay"`
 	Serve     ServeConfig       `toml:"serve"`
 	Processes map[string]string `toml:"processes"`
+	Suppress  SuppressConfig    `toml:"suppress"`
+	Force     ForceConfig       `toml:"force"`
+	Proctree  ProctreeConfig    `toml:"proctree"`
 }
 
 type FormatConfig struct {
@@ -92,6 +95,34 @@ type TunnelConfig struct {
 	User             string `toml:"user"`
 	RemoteSocketPath string `toml:"remote_socket_path"`
 	IdentityFile     string `toml:"identity_file"`
+}
+
+// SuppressConfig describes a global suppression escape hatch keyed off
+// env var presence (e.g. IN_MEETING).
+type SuppressConfig struct {
+	IfEnv []string `toml:"if_env"`
+}
+
+// ForceConfig describes a global force-fire override keyed off env var
+// presence (e.g. ATTN_FORCE).
+type ForceConfig struct {
+	IfEnv []string `toml:"if_env"`
+}
+
+// ProctreeConfig holds proctree marker rules.
+type ProctreeConfig struct {
+	Markers []MarkerConfig `toml:"marker"`
+}
+
+// MarkerConfig is the on-disk shape of a single marker. Type is a plain
+// string so config doesn't need to import internal/marker; cmd/markers.go
+// does the conversion.
+type MarkerConfig struct {
+	Name            string   `toml:"name"`
+	Type            string   `toml:"type"`
+	Label           string   `toml:"label"`
+	MatchEnv        []string `toml:"match_env"`
+	CmdlineContains string   `toml:"cmdline_contains"`
 }
 
 // Default returns a Config with sensible defaults.
@@ -162,7 +193,31 @@ func Load(path string) (Config, error) {
 		}
 	}
 
+	if err := validateMarkers(cfg.Proctree.Markers); err != nil {
+		return cfg, err
+	}
+
 	return cfg, nil
+}
+
+// validateMarkers checks that each marker has a non-empty Name and a Type
+// that's one of the recognized values. Errors include the marker index and
+// name (when available) so users can find the bad entry.
+func validateMarkers(markers []MarkerConfig) error {
+	for i, m := range markers {
+		if m.Name == "" {
+			return fmt.Errorf("proctree.marker[%d]: name is required", i)
+		}
+		switch m.Type {
+		case "focus_check", "delegate":
+			// ok
+		case "":
+			return fmt.Errorf("proctree.marker[%d] (%q): type is required", i, m.Name)
+		default:
+			return fmt.Errorf("proctree.marker[%d] (%q): invalid type %q (want \"focus_check\" or \"delegate\")", i, m.Name, m.Type)
+		}
+	}
+	return nil
 }
 
 // migrateDesktop resolves When from deprecated Enabled if When is unset.

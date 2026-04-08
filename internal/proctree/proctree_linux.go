@@ -94,6 +94,18 @@ func IsAncestor(pid, possibleAncestor int) bool {
 	return false
 }
 
+// Cmdline reads /proc/<pid>/cmdline and returns the joined command line with
+// NUL byte argument separators replaced by spaces. Returns "" on error.
+func Cmdline(pid int) string {
+	data, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/cmdline")
+	if err != nil {
+		return ""
+	}
+	// Trim trailing NUL (cmdline often ends with one) before replacing.
+	trimmed := strings.TrimRight(string(data), "\x00")
+	return strings.ReplaceAll(trimmed, "\x00", " ")
+}
+
 // readStatus reads /proc/<pid>/status and returns the process name and parent PID.
 func readStatus(pid int) (string, int, error) {
 	data, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/status")

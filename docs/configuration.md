@@ -93,6 +93,18 @@ name = "devbox"
 host = "devbox.example.com"
 user = "peter"
 remote_socket_path = "/run/user/1000/attn.sock"
+
+[suppress]
+if_env = ["IN_MEETING"]            # any of these set → suppress every channel
+
+[force]
+if_env = ["ATTN_FORCE"]             # any of these set → fire every channel
+
+[[proctree.marker]]                 # rules for ancestor processes
+name      = "node"
+type      = "delegate"              # "delegate" or "focus_check"
+label     = "WebTerm"
+match_env = ["WEBTERM_ID"]
 ```
 
 ## The `when` field
@@ -211,6 +223,37 @@ PID       NAME             LABEL
 ```
 
 The comm name is the `Name:` field from `/proc/<pid>/status` — typically the executable basename, truncated to 15 characters.
+
+## Proctree markers and global overrides
+
+Two related sections control whether a notification fires regardless of the per-channel `when`:
+
+```toml
+[suppress]
+if_env = ["IN_MEETING", "DND"]      # presence-only — any var set → suppress
+
+[force]
+if_env = ["ATTN_FORCE"]             # presence-only — any var set → fire
+
+[[proctree.marker]]
+name             = "node"           # required: exact /proc/<pid>/status Name match
+type             = "delegate"       # required: "delegate" or "focus_check"
+label            = "WebTerm"      # optional: populates {{.Process}}
+match_env        = ["WEBTERM_ID"]  # optional: AND across all listed vars
+cmdline_contains = "webterm"        # optional: substring of /proc/<pid>/cmdline
+```
+
+| Section | What it does |
+|---------|--------------|
+| `[suppress]` | If any listed env var is set on attn's own process, suppress every channel. Beats markers and `[force]`. Applies on the relay side too (host mood). |
+| `[force]` | If any listed env var is set, fire every channel (except `when = "never"`). Beats markers. Applies on the relay side too. |
+| `[[proctree.marker]]` | Per-marker rule attached to an ancestor process. `delegate` suppresses active channels (idle channels still fire as the AFK fallback). `focus_check` defers to the existing focused-window check. Markers do **not** apply on the relay side. |
+
+Marker matching is bottom-up over ancestors (innermost wins) and declaration-order within each ancestor. Distinguishers (`match_env`, `cmdline_contains`) are AND-composed. The `match_env` list itself is also AND across all listed vars: `match_env = ["A", "B"]` requires both A and B to be set.
+
+If a marker's `label` is set and the marker matches, it takes precedence over `[processes]` for `{{.Process}}`. The `[processes]` table continues to work unchanged as a pure rendering shorthand when no marker matched.
+
+See [Focus Detection](focus-detection.md) for the full precedence ladder, examples, and rationale.
 
 ## Relay (channel)
 

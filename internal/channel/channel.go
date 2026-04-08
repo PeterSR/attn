@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/petersr/attn/internal/focus"
+	"github.com/petersr/attn/internal/marker"
 	"github.com/petersr/attn/internal/notification"
 	"github.com/petersr/attn/internal/screen"
 )
@@ -38,20 +39,60 @@ type Entry struct {
 
 // ScreenState captures the current screen and focus state,
 // evaluated once per dispatch to avoid redundant detection.
+//
+// The marker-related fields (ForceSuppress, ForceFire, MarkerVerdict, ...)
+// are populated by the cmd/markers.go overlay after DetectScreenState runs;
+// the channel package itself has no config knowledge.
 type ScreenState struct {
 	Idle          bool // Screen is off or locked.
 	InProcessTree bool // Focused window shares process tree with attn.
 	DetectionOK   bool // Screen state was successfully detected.
+
+	// ForceSuppress is set when a global [suppress] env var is present.
+	// Suppresses every channel regardless of When.
+	ForceSuppress bool
+	// ForceFire is set when a global [force] env var is present. Fires
+	// every channel regardless of When (except WhenNever).
+	ForceFire bool
+	// MarkerVerdict is the result of walking the proctree marker rules.
+	MarkerVerdict marker.Verdict
+	// MarkerLabel is the matched marker's label, used for {{.Process}}.
+	MarkerLabel string
+	// MarkerReason is a human-readable summary for verbose output.
+	MarkerReason string
 }
 
 // ShouldFire returns true if the given When condition is met by the state.
+//
+// Precedence (applied at the top of every When except Never):
+//  1. ForceSuppress short-circuits to false.
+//  2. ForceFire short-circuits to true.
+//  3. For WhenActive only, marker verdicts apply: VerdictSuppress → false,
+//     VerdictFocusCheck → fall through to the existing in-process-tree check,
+//     VerdictFallthrough → existing logic. Markers do not affect WhenIdle
+//     (idle channels are the AFK fallback and should still fire).
 func ShouldFire(when When, state ScreenState) bool {
 	switch when {
 	case WhenNever:
 		return false
 	case WhenAlways:
+		if state.ForceSuppress {
+			return false
+		}
 		return true
 	case WhenActive:
+		if state.ForceSuppress {
+			return false
+		}
+		if state.ForceFire {
+			return true
+		}
+		switch state.MarkerVerdict {
+		case marker.VerdictSuppress:
+			return false
+		case marker.VerdictFocusCheck:
+			// Fall through to the existing in-process-tree check below.
+		}
 		if !state.DetectionOK {
 			return true // Fail-open: fire if we can't detect.
 		}
@@ -63,6 +104,12 @@ func ShouldFire(when When, state ScreenState) bool {
 		}
 		return true
 	case WhenIdle:
+		if state.ForceSuppress {
+			return false
+		}
+		if state.ForceFire {
+			return true
+		}
 		if !state.DetectionOK {
 			return false // Fail-closed: don't fire if we can't detect.
 		}
@@ -180,10 +227,20 @@ func DispatchFilteredVerbose(ctx context.Context, entries []Entry, state ScreenS
 
 // skipReason explains why ShouldFire returned false for the given condition and state.
 func skipReason(when When, state ScreenState) string {
-	switch when {
-	case WhenNever:
+	if when == WhenNever {
 		return "when=never"
+	}
+	if state.ForceSuppress {
+		return "suppressed by env"
+	}
+	switch when {
 	case WhenActive:
+		if state.MarkerVerdict == marker.VerdictSuppress {
+			if state.MarkerReason != "" {
+				return "marker: " + state.MarkerReason
+			}
+			return "marker: suppressed"
+		}
 		if state.Idle {
 			return "screen idle"
 		}

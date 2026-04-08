@@ -6,7 +6,7 @@ A cross-platform notification tool that alerts you when long-running processes �
 
 ## Features
 
-- **Smart focus detection** — automatically suppresses notifications when you're looking at the terminal that triggered them (process-tree matching via X11 `_NET_WM_PID` / Wayland)
+- **Smart focus detection** — automatically suppresses notifications when you're looking at the terminal that triggered them (process-tree matching via X11 `_NET_WM_PID` / Wayland), with configurable markers for nested setups and env-var DND/force overrides
 - **Screen-aware routing** — send desktop notifications when active, push to your phone when the screen is locked
 - **Desktop notifications** — native D-Bus on Linux (no `notify-send` required), osascript on macOS
 - **Push notifications** — ntfy.sh, Pushover, generic webhooks (Slack, Discord, etc.)
@@ -181,6 +181,8 @@ attn → bash (hook) → claude → bash (shell) → warp (PID 1234)
 It then gets the focused window's PID (via X11 `_NET_WM_PID` or Wayland D-Bus) and checks if that PID is a direct ancestor in attn's chain. If it is (e.g., the focused window is the Warp terminal that spawned attn), the notification is suppressed — you're already looking at it.
 
 This means **no configuration is needed** for focus suppression. It works automatically when called from any context (Claude Code hooks, shell scripts, CI runners).
+
+For nested setups (Claude inside a browser-served web terminal, agents delegated to a custom notifier, etc.) the default ancestry rule isn't enough. attn supports **proctree markers** to attach `delegate` or `focus_check` rules to specific ancestors, plus global `[suppress]` / `[force]` env-var lists for transient mute / override. See [Focus Detection](docs/focus-detection.md) for the precedence ladder and examples.
 
 ## Remote Notifications via SSH
 

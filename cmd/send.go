@@ -9,6 +9,7 @@ import (
 	"github.com/petersr/attn/internal/autocontext"
 	"github.com/petersr/attn/internal/channel"
 	"github.com/petersr/attn/internal/config"
+	"github.com/petersr/attn/internal/marker"
 	"github.com/petersr/attn/internal/notification"
 	"github.com/petersr/attn/internal/proctree"
 	"github.com/petersr/attn/internal/render"
@@ -35,9 +36,28 @@ func (s *SendCmd) Run(globals *CLI) error {
 		return err
 	}
 
-	// Gather context and resolve process label.
+	// Build channel entries with When conditions (hops=0 for direct send).
+	entries := buildChannelEntries(cfg, 0)
+	if len(entries) == 0 {
+		// Render with empty info before bailing so the user sees something useful.
+		fallbackInfo := autocontext.Gather()
+		fmt.Fprintf(os.Stderr, "attn: no channels configured. Message: %s — %s\n",
+			render.Render(s.Title, fallbackInfo),
+			render.Render(strings.Join(s.Message, " "), fallbackInfo))
+		return nil
+	}
+
+	// Evaluate screen state once (hops=0 for direct send), then overlay
+	// marker and global env state.
+	state := channel.DetectScreenState(entries, 0)
+	applyMarkerOverlay(&state, cfg, 0)
+
+	// Gather context and resolve process label. Marker label wins; otherwise
+	// fall back to the [processes] table.
 	info := autocontext.Gather()
-	if len(cfg.Processes) > 0 {
+	if state.MarkerLabel != "" {
+		info.Process = state.MarkerLabel
+	} else if len(cfg.Processes) > 0 {
 		chain := proctree.AncestorsNamed(os.Getpid())
 		info.Process = proctree.MatchKnown(chain, cfg.Processes)
 	}
@@ -53,19 +73,12 @@ func (s *SendCmd) Run(globals *CLI) error {
 		TimeoutMS: s.Timeout,
 	}
 
-	// Build channel entries with When conditions (hops=0 for direct send).
-	entries := buildChannelEntries(cfg, 0)
-	if len(entries) == 0 {
-		fmt.Fprintf(os.Stderr, "attn: no channels configured. Message: %s — %s\n", n.Title, n.Body)
-		return nil
-	}
-
-	// Evaluate screen state once (hops=0 for direct send).
-	state := channel.DetectScreenState(entries, 0)
-
 	if s.Verbose {
 		fmt.Fprintf(os.Stderr, "attn: screen: idle=%v inProcessTree=%v detectionOK=%v\n",
 			state.Idle, state.InProcessTree, state.DetectionOK)
+		if state.ForceSuppress || state.ForceFire || state.MarkerVerdict != marker.VerdictFallthrough {
+			fmt.Fprintf(os.Stderr, "attn: marker: %s\n", state.MarkerReason)
+		}
 
 		results, err := channel.DispatchFilteredVerbose(context.Background(), entries, state, n)
 		for _, r := range results {

@@ -102,6 +102,19 @@ func TestMatchKnownSkipsSelf(t *testing.T) {
 	}
 }
 
+func TestCmdlineSelf(t *testing.T) {
+	cmdline := Cmdline(os.Getpid())
+	if cmdline == "" {
+		t.Fatal("Cmdline(self) returned empty string")
+	}
+}
+
+func TestCmdlineNonexistent(t *testing.T) {
+	if got := Cmdline(99999999); got != "" {
+		t.Errorf("Cmdline(99999999) = %q, want empty", got)
+	}
+}
+
 func TestMatchKnownNoMatch(t *testing.T) {
 	chain := []ProcessInfo{
 		{PID: 100, Name: "attn"},
