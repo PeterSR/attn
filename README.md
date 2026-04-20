@@ -48,6 +48,9 @@ attn send -t '{{env "USER"}}' "Task done"
 # Override when condition per channel (ad-hoc)
 attn send -w bell=always "Build complete"
 attn send -w desktop=always -w bell=always "urgent"
+
+# Send via a single channel, bypassing all others
+attn send --via ntfy "heads up"
 ```
 
 ### Commands
@@ -71,6 +74,7 @@ attn version                     Print version
 | `--timeout` | `-T` | `5000` | Display timeout in milliseconds |
 | `--verbose` | `-v` | `false` | Print channel evaluation details to stderr |
 | `--when` | `-w` | | Override `when` condition per channel (e.g. `desktop=always`) |
+| `--via` | | | Send only via this channel, bypassing all others (e.g. `--via ntfy`). Errors if the channel isn't configured. |
 
 ### Global flags
 

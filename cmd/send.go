@@ -22,6 +22,7 @@ type SendCmd struct {
 	Timeout int               `short:"T" default:"5000" help:"Timeout in milliseconds."`
 	Verbose bool              `short:"v" help:"Print channel evaluation details to stderr."`
 	When    map[string]string `short:"w" help:"Override when condition per channel (e.g. desktop=always)."`
+	Via     string            `help:"Send only via this channel, bypassing all others and any when conditions."`
 	Message []string          `arg:"" optional:"" help:"Notification message body (supports Go templates)."`
 }
 
@@ -33,6 +34,10 @@ func (s *SendCmd) Run(globals *CLI) error {
 	}
 
 	if err := applyWhenOverrides(&cfg, s.When); err != nil {
+		return err
+	}
+
+	if err := applyViaOverride(&cfg, s.Via); err != nil {
 		return err
 	}
 
@@ -126,6 +131,59 @@ func applyWhenOverrides(cfg *config.Config, overrides map[string]string) error {
 		default:
 			return fmt.Errorf("unknown channel %q (valid: desktop, bell, ntfy, pushover, webhook, relay)", ch)
 		}
+	}
+	return nil
+}
+
+// applyViaOverride forces a single channel to fire and silences all others.
+// Errors if the channel name is unknown or the channel lacks required config.
+func applyViaOverride(cfg *config.Config, name string) error {
+	if name == "" {
+		return nil
+	}
+	switch name {
+	case "desktop":
+		cfg.Desktop.When = config.WhenAlways
+	case "bell":
+		cfg.Bell.When = config.WhenAlways
+	case "ntfy":
+		if cfg.Ntfy.Topic == "" {
+			return fmt.Errorf("channel %q is not configured (missing ntfy.topic)", name)
+		}
+		cfg.Ntfy.When = config.WhenAlways
+	case "pushover":
+		if cfg.Pushover.Token == "" || cfg.Pushover.UserKey == "" {
+			return fmt.Errorf("channel %q is not configured (missing pushover.token or pushover.user_key)", name)
+		}
+		cfg.Pushover.When = config.WhenAlways
+	case "webhook":
+		if cfg.Webhook.URL == "" {
+			return fmt.Errorf("channel %q is not configured (missing webhook.url)", name)
+		}
+		cfg.Webhook.When = config.WhenAlways
+	case "relay":
+		cfg.Relay.When = config.WhenAlways
+	default:
+		return fmt.Errorf("unknown channel %q (valid: desktop, bell, ntfy, pushover, webhook, relay)", name)
+	}
+
+	if name != "desktop" {
+		cfg.Desktop.When = config.WhenNever
+	}
+	if name != "bell" {
+		cfg.Bell.When = config.WhenNever
+	}
+	if name != "ntfy" {
+		cfg.Ntfy.When = config.WhenNever
+	}
+	if name != "pushover" {
+		cfg.Pushover.When = config.WhenNever
+	}
+	if name != "webhook" {
+		cfg.Webhook.When = config.WhenNever
+	}
+	if name != "relay" {
+		cfg.Relay.When = config.WhenNever
 	}
 	return nil
 }

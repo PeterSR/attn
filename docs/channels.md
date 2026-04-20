@@ -113,6 +113,16 @@ attn send -w desktop=always -w bell=always "urgent notification"
 Valid channel names: `desktop`, `bell`, `ntfy`, `pushover`, `webhook`, `relay`.
 Valid when values: `never`, `active`, `idle`, `always`.
 
+### `--via` shortcut
+
+For the common case of "send through one specific channel and nothing else", use `--via`:
+
+```bash
+attn send --via ntfy "heads up"
+```
+
+This sets the named channel to `always` and silences every other channel for this send. It's applied *after* any `-w` overrides and errors if the channel is unknown or missing required config (e.g. `--via ntfy` without `ntfy.topic`).
+
 ## Channel dispatch
 
 All enabled channels fire concurrently with a 10-second per-channel timeout. Screen state (active/idle) and process-tree focus are evaluated once before dispatch, not per-channel.
