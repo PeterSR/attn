@@ -298,6 +298,29 @@ label = "Warp"
 	}
 }
 
+func TestLoadMarkerSuppressType(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	content := `
+[[proctree.marker]]
+name = "bloodhound"
+type = "suppress"
+`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() should accept type = \"suppress\": %v", err)
+	}
+	if len(cfg.Proctree.Markers) != 1 {
+		t.Fatalf("got %d markers, want 1", len(cfg.Proctree.Markers))
+	}
+	if m := cfg.Proctree.Markers[0]; m.Name != "bloodhound" || m.Type != "suppress" {
+		t.Errorf("marker[0] = %+v", m)
+	}
+}
+
 func TestLoadSuppressIfEnv(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")

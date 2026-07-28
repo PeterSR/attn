@@ -65,23 +65,25 @@ type ScreenState struct {
 // ShouldFire returns true if the given When condition is met by the state.
 //
 // Precedence (applied at the top of every When except Never):
-//  1. ForceSuppress short-circuits to false.
+//  1. A hard off — the global [suppress] env switch or a VerdictHardSuppress
+//     marker — short-circuits to false for every When, WhenAlways included.
 //  2. ForceFire short-circuits to true.
-//  3. For WhenActive only, marker verdicts apply: VerdictSuppress → false,
-//     VerdictFocusCheck → fall through to the existing in-process-tree check,
-//     VerdictFallthrough → existing logic. Markers do not affect WhenIdle
-//     (idle channels are the AFK fallback and should still fire).
+//  3. For WhenActive only, the softer marker verdicts apply:
+//     VerdictSuppress → false, VerdictFocusCheck → fall through to the
+//     existing in-process-tree check, VerdictFallthrough → existing logic.
+//     VerdictSuppress deliberately does not affect WhenIdle: delegate means
+//     another notifier has the user, so the AFK fallback should still fire.
 func ShouldFire(when When, state ScreenState) bool {
 	switch when {
 	case WhenNever:
 		return false
 	case WhenAlways:
-		if state.ForceSuppress {
+		if hardOff(state) {
 			return false
 		}
 		return true
 	case WhenActive:
-		if state.ForceSuppress {
+		if hardOff(state) {
 			return false
 		}
 		if state.ForceFire {
@@ -104,7 +106,7 @@ func ShouldFire(when When, state ScreenState) bool {
 		}
 		return true
 	case WhenIdle:
-		if state.ForceSuppress {
+		if hardOff(state) {
 			return false
 		}
 		if state.ForceFire {
@@ -117,6 +119,13 @@ func ShouldFire(when When, state ScreenState) bool {
 	default:
 		return false
 	}
+}
+
+// hardOff reports whether the state silences every channel outright,
+// whatever its When: either the global [suppress] env switch or a proctree
+// suppress marker matched.
+func hardOff(state ScreenState) bool {
+	return state.ForceSuppress || state.MarkerVerdict == marker.VerdictHardSuppress
 }
 
 // DetectScreenState evaluates screen and focus state once. Only performs
@@ -233,13 +242,13 @@ func skipReason(when When, state ScreenState) string {
 	if state.ForceSuppress {
 		return "suppressed by env"
 	}
+	if state.MarkerVerdict == marker.VerdictHardSuppress {
+		return markerSkipReason(state)
+	}
 	switch when {
 	case WhenActive:
 		if state.MarkerVerdict == marker.VerdictSuppress {
-			if state.MarkerReason != "" {
-				return "marker: " + state.MarkerReason
-			}
-			return "marker: suppressed"
+			return markerSkipReason(state)
 		}
 		if state.Idle {
 			return "screen idle"
@@ -256,6 +265,15 @@ func skipReason(when When, state ScreenState) string {
 	default:
 		return "skipped"
 	}
+}
+
+// markerSkipReason renders the marker that silenced a channel, for verbose
+// output. Falls back to a bare label when the walker gave no reason.
+func markerSkipReason(state ScreenState) string {
+	if state.MarkerReason != "" {
+		return "marker: " + state.MarkerReason
+	}
+	return "marker: suppressed"
 }
 
 // Dispatch fires a notification to all channels concurrently.

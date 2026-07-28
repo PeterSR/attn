@@ -186,7 +186,7 @@ It then gets the focused window's PID (via X11 `_NET_WM_PID` or Wayland D-Bus) a
 
 This means **no configuration is needed** for focus suppression. It works automatically when called from any context (Claude Code hooks, shell scripts, CI runners).
 
-For nested setups (Claude inside a browser-served web terminal, agents delegated to a custom notifier, etc.) the default ancestry rule isn't enough. attn supports **proctree markers** to attach `delegate` or `focus_check` rules to specific ancestors, plus global `[suppress]` / `[force]` env-var lists for transient mute / override. See [Focus Detection](docs/focus-detection.md) for the precedence ladder and examples.
+For nested setups (Claude inside a browser-served web terminal, agents delegated to a custom notifier, etc.) the default ancestry rule isn't enough. attn supports **proctree markers** to attach `delegate`, `focus_check`, or `suppress` rules to specific ancestors, plus global `[suppress]` / `[force]` env-var lists for transient mute / override. See [Focus Detection](docs/focus-detection.md) for the precedence ladder and examples.
 
 ## Remote Notifications via SSH
 

@@ -66,6 +66,14 @@ func TestShouldFire(t *testing.T) {
 
 		// Markers do not affect Idle.
 		{"marker_does_not_affect_idle", WhenIdle, ScreenState{DetectionOK: true, Idle: true, MarkerVerdict: marker.VerdictSuppress}, true},
+
+		// Marker suppress is a hard off: every When, whatever the screen state.
+		{"marker_hard_suppress/skips_active", WhenActive, ScreenState{DetectionOK: true, MarkerVerdict: marker.VerdictHardSuppress}, false},
+		{"marker_hard_suppress/skips_idle", WhenIdle, ScreenState{DetectionOK: true, Idle: true, MarkerVerdict: marker.VerdictHardSuppress}, false},
+		{"marker_hard_suppress/skips_always", WhenAlways, ScreenState{MarkerVerdict: marker.VerdictHardSuppress}, false},
+		{"marker_hard_suppress/skips_when_detection_fails", WhenActive, ScreenState{MarkerVerdict: marker.VerdictHardSuppress}, false},
+		{"marker_hard_suppress/beats_force_fire", WhenActive, ScreenState{DetectionOK: true, ForceFire: true, MarkerVerdict: marker.VerdictHardSuppress}, false},
+		{"marker_hard_suppress/never_still_false", WhenNever, ScreenState{MarkerVerdict: marker.VerdictHardSuppress}, false},
 	}
 
 	for _, tt := range tests {
@@ -75,5 +83,22 @@ func TestShouldFire(t *testing.T) {
 				t.Errorf("ShouldFire(%q, %+v) = %v, want %v", tt.when, tt.state, got, tt.want)
 			}
 		})
+	}
+}
+
+// A hard suppress must be reported as the cause for every When, not
+// misattributed to screen state ("screen active") or a bare "skipped".
+func TestSkipReasonHardSuppressReportsMarker(t *testing.T) {
+	state := ScreenState{
+		DetectionOK:   true,
+		Idle:          true,
+		MarkerVerdict: marker.VerdictHardSuppress,
+		MarkerReason:  "suppress bloodhound(pid=1635)",
+	}
+	want := "marker: suppress bloodhound(pid=1635)"
+	for _, when := range []When{WhenActive, WhenIdle, WhenAlways} {
+		if got := skipReason(when, state); got != want {
+			t.Errorf("skipReason(%q) = %q, want %q", when, got, want)
+		}
 	}
 }

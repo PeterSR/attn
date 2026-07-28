@@ -256,6 +256,29 @@ func TestWalkDelegateVerdictPropagates(t *testing.T) {
 	}
 }
 
+func TestWalkSuppressVerdictPropagates(t *testing.T) {
+	c := chain(
+		proctree.ProcessInfo{PID: 100, Name: "attn"},
+		proctree.ProcessInfo{PID: 99, Name: "bloodhound"},
+	)
+	markers := []Marker{{Name: "bloodhound", Type: TypeSuppress}}
+	got := Walk(c, markers, envMap(nil), cmdlineMap(nil))
+	if got.Verdict != VerdictHardSuppress {
+		t.Errorf("Verdict = %v, want VerdictHardSuppress", got.Verdict)
+	}
+}
+
+func TestTypeValid(t *testing.T) {
+	for _, ty := range []Type{TypeFocusCheck, TypeDelegate, TypeSuppress} {
+		if !ty.Valid() {
+			t.Errorf("Type(%q).Valid() = false, want true", ty)
+		}
+	}
+	if Type("bogus").Valid() {
+		t.Error(`Type("bogus").Valid() = true, want false`)
+	}
+}
+
 func TestWalkFocusCheckVerdictPropagates(t *testing.T) {
 	c := chain(
 		proctree.ProcessInfo{PID: 100, Name: "attn"},

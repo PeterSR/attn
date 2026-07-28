@@ -63,8 +63,9 @@ Markers let you attach a rule to a specific ancestor process. When the walker hi
 
 | Type | Meaning |
 |------|---------|
-| `delegate` | Another notifier owns this subtree. Suppress active channels. (Idle channels still fire — they're your AFK fallback.) |
+| `delegate` | Another notifier owns this subtree and is telling a human. Suppress active channels only. (Idle channels still fire: they're your AFK fallback, and the other notifier's banner can't reach a user who's away from the machine.) |
 | `focus_check` | This ancestor is a UI surface. Suppress if its window is the focused one (i.e., fall through to the existing in-process-tree check). |
+| `suppress` | A hard off. Nothing under this ancestor ever notifies, through any channel, regardless of `when`, `always` and `idle` included. For machine-driven sessions that no human is waiting on (a scheduled agent daemon, a supervisor process driving another agent, and so on). |
 
 Markers are matched by `name` (exact match against `/proc/<pid>/status` `Name:`) plus optional **distinguishers** that are AND-composed:
 
@@ -95,6 +96,29 @@ type = "focus_check"
 
 Translation: "If any ancestor is `tmux: server`, treat it as a focusable UI surface — fall through to the normal focused-window check."
 
+### Example: hard-suppress a machine-driven session
+
+Some subtrees have no human waiting on them at all: a scheduled agent daemon that wakes up periodically to drive a headless Claude session and collect data, or a pty supervisor one agent uses to drive another agent. Neither case has anyone to notify, so `delegate` isn't quite right (it deliberately leaves the idle/AFK fallback armed). These want a hard off instead:
+
+```toml
+[[proctree.marker]]
+name = "bloodhound"
+type = "suppress"
+
+[[proctree.marker]]
+name = "pupptyeer"
+type = "suppress"
+```
+
+Translation: "If any ancestor is `bloodhound` (the scheduled data-collection daemon) or `pupptyeer` (the pty supervisor one agent uses to drive another), nothing beneath it should ever notify, on any channel, no matter what `when` says."
+
+### Choosing between `delegate` and `suppress`
+
+Both markers quiet things down, but for different reasons, and picking the wrong one either spams a duplicate popup or silently drops something a human needed to see:
+
+- Use `delegate` when a human is still being told, just through a different notifier, and you only want to avoid a duplicate popup. The idle fallback stays armed in case that other notifier can't reach the person (screen locked, away from the machine, etc.).
+- Use `suppress` when no human is involved at all. If nobody is waiting on the result, there's no fallback worth preserving, so every channel should just stay quiet.
+
 ### Marker `label` and `[processes]`
 
 Both `label` and the `[processes]` table populate `{{.Process}}`. **Marker label wins** when a marker matches; otherwise `[processes]` is consulted as before. The `[processes]` table is unchanged and continues to work as a pure rendering shorthand.
@@ -117,16 +141,18 @@ These describe the host's mood — DND, in a meeting, "ignore my usual rules jus
 
 When `ShouldFire` evaluates a channel, the precedence is:
 
-1. **`when = "never"`** — always false. Nothing overrides this.
-2. **`[suppress]` env var set** — false. Beats everything else.
-3. **`[force]` env var set** — true (unless `when = "never"`). Beats markers.
-4. **Marker verdict** (active channels only):
+1. **`when = "never"`**: always false. Nothing overrides this.
+2. **Hard off**: either the global `[suppress]` env var or a matched `suppress` marker. False for every `when`, `always` included.
+3. **`[force]` env var set**: true (unless `when = "never"`).
+4. **Softer marker verdicts** (`when = "active"` only):
    - `delegate` matched → false
    - `focus_check` matched → fall through to step 5
    - no marker matched → fall through to step 5
-5. **Existing logic** — `WhenActive` checks idle / in-process-tree; `WhenIdle` checks idle; `WhenAlways` fires; etc.
+5. **Existing logic**: `WhenActive` checks idle / in-process-tree; `WhenIdle` checks idle; `WhenAlways` fires; etc.
 
-Markers do **not** affect `when = "idle"` channels. Idle channels are the AFK fallback (push to phone when screen is locked), and silencing them based on local proctree state would defeat the purpose. If you need to mute everything globally, use `[suppress]`.
+One ordering subtlety: `[force]` is checked in `internal/marker/evaluate.go` before the proctree walk ever runs, not after step 2 as the list order above might suggest. So when a force env var is set, the walk is skipped entirely and `[force]` beats every marker, `suppress` included. This never actually produces a conflict with step 2, because a `suppress` marker verdict can only exist if the walk ran, and the walk only runs when no force env var was set in the first place.
+
+Markers do **not** all behave the same way against `when = "idle"` channels. `delegate` leaves idle channels alone: they're the AFK fallback (push to phone when screen is locked), and silencing them based on local proctree state would defeat the purpose. `suppress` is different: it's a hard off, so it silences idle channels too, on the assumption that nobody is waiting on the result at all. Use the global `[suppress]` env var to mute everything regardless of process tree; use a `suppress` marker to mute one specific subtree, idle fallback included.
 
 ## Verbose output
 
@@ -138,6 +164,16 @@ attn: marker: delegate node(pid=4321) env=WEBTERM_ID
 attn: desktop(when=active): skipped (marker: delegate node(pid=4321) env=WEBTERM_ID)
 attn: ntfy(when=idle): skipped (screen active)
 ```
+
+A `suppress` marker reports the same reason for every channel, `when = "idle"` included, since it's a hard off rather than an active-only verdict:
+
+```
+attn: marker: suppress bloodhound(pid=1635)
+attn: desktop(when=active): skipped (marker: suppress bloodhound(pid=1635))
+attn: ntfy(when=idle): skipped (marker: suppress bloodhound(pid=1635))
+```
+
+Compare the last line to the `delegate` example above: an idle channel skipped by `delegate` reports `screen active` (or fires, if the screen actually is idle), while one skipped by `suppress` reports the marker itself, because `suppress` overrides idle channels outright instead of deferring to them.
 
 ## Implementation
 

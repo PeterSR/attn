@@ -102,7 +102,7 @@ if_env = ["ATTN_FORCE"]             # any of these set → fire every channel
 
 [[proctree.marker]]                 # rules for ancestor processes
 name      = "node"
-type      = "delegate"              # "delegate" or "focus_check"
+type      = "delegate"              # "delegate", "focus_check", or "suppress"
 label     = "WebTerm"
 match_env = ["WEBTERM_ID"]
 ```
@@ -237,7 +237,7 @@ if_env = ["ATTN_FORCE"]             # presence-only — any var set → fire
 
 [[proctree.marker]]
 name             = "node"           # required: exact /proc/<pid>/status Name match
-type             = "delegate"       # required: "delegate" or "focus_check"
+type             = "delegate"       # required: "delegate", "focus_check", or "suppress"
 label            = "WebTerm"      # optional: populates {{.Process}}
 match_env        = ["WEBTERM_ID"]  # optional: AND across all listed vars
 cmdline_contains = "webterm"        # optional: substring of /proc/<pid>/cmdline
@@ -246,8 +246,8 @@ cmdline_contains = "webterm"        # optional: substring of /proc/<pid>/cmdline
 | Section | What it does |
 |---------|--------------|
 | `[suppress]` | If any listed env var is set on attn's own process, suppress every channel. Beats markers and `[force]`. Applies on the relay side too (host mood). |
-| `[force]` | If any listed env var is set, fire every channel (except `when = "never"`). Beats markers. Applies on the relay side too. |
-| `[[proctree.marker]]` | Per-marker rule attached to an ancestor process. `delegate` suppresses active channels (idle channels still fire as the AFK fallback). `focus_check` defers to the existing focused-window check. Markers do **not** apply on the relay side. |
+| `[force]` | If any listed env var is set, fire every channel (except `when = "never"`). Beats markers, including `suppress` markers, because it short-circuits before the proctree walk even runs. Applies on the relay side too. |
+| `[[proctree.marker]]` | Per-marker rule attached to an ancestor process. `delegate` suppresses active channels only (idle channels still fire as the AFK fallback). `focus_check` defers to the existing focused-window check. `suppress` is a hard off: it silences every channel regardless of `when`, including `always` and `idle`, for machine-driven sessions that no human is waiting on. Markers do **not** apply on the relay side. |
 
 Marker matching is bottom-up over ancestors (innermost wins) and declaration-order within each ancestor. Distinguishers (`match_env`, `cmdline_contains`) are AND-composed. The `match_env` list itself is also AND across all listed vars: `match_env = ["A", "B"]` requires both A and B to be set.
 

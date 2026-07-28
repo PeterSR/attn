@@ -209,12 +209,12 @@ func validateMarkers(markers []MarkerConfig) error {
 			return fmt.Errorf("proctree.marker[%d]: name is required", i)
 		}
 		switch m.Type {
-		case "focus_check", "delegate":
+		case "focus_check", "delegate", "suppress":
 			// ok
 		case "":
 			return fmt.Errorf("proctree.marker[%d] (%q): type is required", i, m.Name)
 		default:
-			return fmt.Errorf("proctree.marker[%d] (%q): invalid type %q (want \"focus_check\" or \"delegate\")", i, m.Name, m.Type)
+			return fmt.Errorf("proctree.marker[%d] (%q): invalid type %q (want \"focus_check\", \"delegate\" or \"suppress\")", i, m.Name, m.Type)
 		}
 	}
 	return nil

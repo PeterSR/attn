@@ -25,11 +25,18 @@ const (
 	// TypeDelegate means: another notifier owns this subtree, so attn
 	// should stay silent for active channels.
 	TypeDelegate Type = "delegate"
+
+	// TypeSuppress means: nothing under this ancestor should ever notify.
+	// Where TypeDelegate assumes some other notifier is telling a human and
+	// so leaves the idle fallback intact, this silences every channel
+	// whatever its When. It is for machine-driven sessions that nobody is
+	// waiting on.
+	TypeSuppress Type = "suppress"
 )
 
 // Valid reports whether t is a known marker type.
 func (t Type) Valid() bool {
-	return t == TypeFocusCheck || t == TypeDelegate
+	return t == TypeFocusCheck || t == TypeDelegate || t == TypeSuppress
 }
 
 // Marker is a single rule. Name is required; the other fields are optional
@@ -63,6 +70,9 @@ const (
 	// VerdictFocusCheck means a focus_check marker matched; the caller
 	// should consult its existing focus comparison.
 	VerdictFocusCheck
+	// VerdictHardSuppress means a suppress marker matched; suppress every
+	// channel regardless of its When condition.
+	VerdictHardSuppress
 )
 
 // Result is what Walk returns.
@@ -140,6 +150,8 @@ func verdictFor(t Type) Verdict {
 		return VerdictSuppress
 	case TypeFocusCheck:
 		return VerdictFocusCheck
+	case TypeSuppress:
+		return VerdictHardSuppress
 	}
 	return VerdictFallthrough
 }
