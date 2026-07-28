@@ -263,7 +263,9 @@ journalctl --user -u attn -f  # view logs
 
 ### Claude Code
 
-Add to your [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) configuration (`.claude/settings.json`):
+The easiest way to get notifications is the [attn Claude Code plugin](https://github.com/PeterSR/attn-claude-code-plugin), which wires up the hooks below for you and lets you toggle and configure them through environment variables instead of editing JSON. Install it with `/plugin marketplace add PeterSR/attn-claude-code-plugin` and `/plugin install attn@attn-claude-code`, then restart Claude Code.
+
+If you'd rather wire things up yourself, or just want to see what the plugin does under the hood, add this to your [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) configuration (`.claude/settings.json`) instead:
 
 ```json
 {
